@@ -1,0 +1,14 @@
+<%- include('../partials/head') %>
+<body class="login-body">
+  <form method="post" action="/admin/login" class="card login-card stack">
+    <h1><%= site.dealer_name %></h1>
+    <p class="muted">Σύνδεση στο Admin Panel</p>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <input type="hidden" name="_csrf" value="<%= csrf() %>">
+    <label class="field"><span>Όνομα χρήστη</span><input name="username" required autocomplete="username" autofocus></label>
+    <label class="field"><span>Κωδικός</span><input name="password" type="password" required autocomplete="current-password"></label>
+    <button class="btn btn-brand btn-block">Σύνδεση</button>
+    <a href="/" class="small muted">← Πίσω στο site</a>
+  </form>
+</body>
+</html>

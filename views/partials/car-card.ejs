@@ -1,0 +1,28 @@
+<article class="car-card<%= car.status === 'sold' ? ' is-sold' : '' %>">
+  <a href="<%= carUrl(car) %>" class="car-card-img">
+    <img loading="lazy" src="<%= car.cover ? `/uploads/${car.cover}` : '/static/img/no-photo.svg' %>" alt="<%= carTitle(car) %>">
+    <span class="badges">
+      <% if (car.featured) { %><span class="badge badge-brand">Προτεινόμενο</span><% } %>
+      <% if (car.status === 'reserved') { %><span class="badge badge-warn">Κρατημένο</span><% } %>
+      <% if (car.status === 'sold') { %><span class="badge badge-dark">Πωλήθηκε</span><% } %>
+      <% if (car.condition === 'Καινούργιο') { %><span class="badge badge-ok">Καινούργιο</span><% } %>
+    </span>
+    <% if (car.image_count) { %><span class="photo-count">📷 <%= car.image_count %></span><% } %>
+  </a>
+  <div class="car-card-body">
+    <h3 class="car-card-title"><a href="<%= carUrl(car) %>"><%= car.make %> <%= car.model %></a></h3>
+    <% if (car.version) { %><div class="car-card-version"><%= car.version %></div><% } %>
+    <ul class="specs-inline">
+      <li><%= fmt.reg(car) %></li>
+      <li><%= fmt.km(car.mileage) %></li>
+      <% if (car.fuel) { %><li><%= car.fuel %></li><% } %>
+      <% if (car.engine_cc) { %><li><%= fmt.num(car.engine_cc) %> cc</li><% } %>
+      <% if (car.power_hp) { %><li><%= car.power_hp %> hp</li><% } %>
+      <% if (car.gearbox) { %><li><%= car.gearbox %></li><% } %>
+    </ul>
+    <div class="car-card-foot">
+      <span class="price"><%= fmt.price(car.price) %></span>
+      <% if (car.vat_deductible) { %><span class="muted small">+ ΦΠΑ εκπίπτει</span><% } else if (car.price_negotiable) { %><span class="muted small">Συζητήσιμη</span><% } %>
+    </div>
+  </div>
+</article>

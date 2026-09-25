@@ -1,0 +1,143 @@
+<%
+  const title2 = carTitle(car);
+  const specs = [
+    ['Χρονολογία', fmt.reg(car)],
+    ['Χιλιόμετρα', fmt.km(car.mileage)],
+    ['Καύσιμο', car.fuel],
+    ['Κυβικά', car.engine_cc ? `${fmt.num(car.engine_cc)} cc` : null],
+    ['Ιπποδύναμη', car.power_hp ? `${car.power_hp} hp` : null],
+    ['Σασμάν', car.gearbox],
+    ['Κίνηση', car.drivetrain],
+    ['Κατηγορία', car.category],
+    ['Αμάξωμα', car.body_type],
+    ['Κατάσταση', car.condition],
+    ['Πόρτες', car.doors],
+    ['Θέσεις', car.seats],
+    ['Χρώμα', car.color],
+    ['Χρώμα εσωτερικού', car.interior_color],
+    ['Προηγούμενοι ιδιοκτήτες', car.previous_owners],
+    ['Κλάση ρύπων', car.emission_class],
+    ['Εκπομπές CO₂', car.co2 ? `${car.co2} g/km` : null],
+    ['Κατανάλωση', car.consumption ? `${String(car.consumption).replace('.', ',')} l/100km` : null],
+    ['Βιβλίο service', car.service_book ? 'Ναι' : null],
+    ['Χωρίς ατύχημα', car.no_accident ? 'Ναι' : null],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+  const imgs = car.images.length ? car.images.map(i => `/uploads/${i.filename}`) : ['/static/img/no-photo.svg'];
+%>
+<%- include('partials/header', { title: `${title2} – ${fmt.price(car.price)}`, metaDescription: `${title2}, ${fmt.reg(car)}, ${fmt.km(car.mileage)}, ${car.fuel || ''}. ${fmt.price(car.price)}`, ogImage: car.images.length ? imgs[0] : null }) %>
+
+<div class="container crumbs">
+  <a href="/">Αγγελίες</a> › <a href="/?make=<%= encodeURIComponent(car.make) %>#results"><%= car.make %></a> › <span><%= car.model %></span>
+  <% if (user) { %><a class="btn btn-light btn-sm crumbs-edit" href="/admin/cars/<%= car.id %>/edit">✏️ Επεξεργασία</a><% } %>
+</div>
+
+<div class="container car-page">
+  <div class="car-main">
+    <div class="gallery" data-gallery>
+      <div class="gallery-main">
+        <img src="<%= imgs[0] %>" alt="<%= title2 %>" data-gallery-main>
+        <% if (imgs.length > 1) { %>
+          <button class="gallery-nav prev" type="button" data-gallery-prev aria-label="Προηγούμενη">‹</button>
+          <button class="gallery-nav next" type="button" data-gallery-next aria-label="Επόμενη">›</button>
+          <span class="gallery-counter" data-gallery-counter>1 / <%= imgs.length %></span>
+        <% } %>
+        <% if (car.status === 'sold') { %><span class="ribbon">Πωλήθηκε</span><% } else if (car.status === 'reserved') { %><span class="ribbon ribbon-warn">Κρατημένο</span><% } %>
+      </div>
+      <% if (imgs.length > 1) { %>
+        <div class="gallery-thumbs">
+          <% imgs.forEach((src, i) => { %>
+            <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-gallery-thumb="<%= i %>"><img loading="lazy" src="<%= src %>" alt=""></button>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <section class="card">
+      <h2>Χαρακτηριστικά</h2>
+      <dl class="spec-table">
+        <% specs.forEach(([k, v]) => { %><div><dt><%= k %></dt><dd><%= v %></dd></div><% }) %>
+      </dl>
+    </section>
+
+    <% if (car.featureList.length) { %>
+      <section class="card">
+        <h2>Εξοπλισμός</h2>
+        <ul class="feature-list">
+          <% car.featureList.forEach(f => { %><li><%= f %></li><% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <% if (car.description) { %>
+      <section class="card">
+        <h2>Περιγραφή</h2>
+        <div class="pre"><%= car.description %></div>
+      </section>
+    <% } %>
+  </div>
+
+  <aside class="car-side">
+    <div class="card price-card">
+      <h1 class="car-title"><%= car.make %> <%= car.model %></h1>
+      <% if (car.version) { %><div class="muted"><%= car.version %></div><% } %>
+      <div class="price-big"><%= fmt.price(car.price) %></div>
+      <div class="price-notes">
+        <% if (car.price_negotiable) { %><span class="chip">Συζητήσιμη</span><% } %>
+        <% if (car.vat_deductible) { %><span class="chip">ΦΠΑ εκπίπτει</span><% } %>
+      </div>
+      <ul class="quick-specs">
+        <li><span>📅</span><%= fmt.reg(car) %></li>
+        <li><span>🛣️</span><%= fmt.km(car.mileage) %></li>
+        <% if (car.fuel) { %><li><span>⛽</span><%= car.fuel %></li><% } %>
+        <% if (car.gearbox) { %><li><span>⚙️</span><%= car.gearbox %></li><% } %>
+        <% if (car.power_hp) { %><li><span>🐎</span><%= car.power_hp %> hp</li><% } %>
+        <% if (car.engine_cc) { %><li><span>🔧</span><%= fmt.num(car.engine_cc) %> cc</li><% } %>
+      </ul>
+      <div class="contact-buttons">
+        <% if (site.phone) { %><a class="btn btn-brand btn-block" href="tel:<%= site.phone.replace(/\s/g, '') %>">📞 <%= site.phone %></a><% } %>
+        <% if (site.mobile) { %><a class="btn btn-light btn-block" href="tel:<%= site.mobile.replace(/\s/g, '') %>">📱 <%= site.mobile %></a><% } %>
+        <% if (site.whatsapp) { %><a class="btn btn-whatsapp btn-block" target="_blank" rel="noopener" href="https://wa.me/<%= site.whatsapp.replace(/\D/g, '') %>?text=<%= encodeURIComponent(`Ενδιαφέρομαι για το ${title2} (#${car.id})`) %>">WhatsApp</a><% } %>
+      </div>
+      <p class="muted small">Κωδικός αγγελίας: #<%= car.id %> · <%= car.views %> προβολές</p>
+    </div>
+
+    <div class="card" id="contact">
+      <h2>Στείλτε μήνυμα</h2>
+      <% if (sent) { %><div class="alert alert-success">Ευχαριστούμε! Το μήνυμά σας στάλθηκε και θα επικοινωνήσουμε σύντομα.</div><% } %>
+      <form method="post" action="/car/<%= car.id %>/inquiry" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrf() %>">
+        <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <input name="name" required maxlength="120" placeholder="Ονοματεπώνυμο *">
+        <input name="phone" type="tel" maxlength="40" placeholder="Τηλέφωνο">
+        <input name="email" type="email" maxlength="200" placeholder="Email">
+        <textarea name="message" required rows="4" maxlength="4000">Γεια σας, ενδιαφέρομαι για το <%= title2 %> (#<%= car.id %>). Είναι ακόμη διαθέσιμο;</textarea>
+        <button class="btn btn-brand btn-block">Αποστολή</button>
+      </form>
+    </div>
+
+    <div class="card dealer-card">
+      <strong><%= site.dealer_name %></strong>
+      <p class="muted"><%= site.address %><%= site.city ? `, ${site.city}` : '' %></p>
+      <p class="pre small"><%= site.hours %></p>
+    </div>
+  </aside>
+</div>
+
+<% if (similar.length) { %>
+<section class="container section">
+  <h2 class="section-title">Παρόμοια αυτοκίνητα</h2>
+  <div class="car-grid car-grid-4">
+    <% similar.forEach(c => { %><%- include('partials/car-card', { car: c }) %><% }) %>
+  </div>
+</section>
+<% } %>
+
+<div class="lightbox" data-lightbox hidden>
+  <button type="button" class="lightbox-close" data-lightbox-close aria-label="Κλείσιμο">×</button>
+  <button type="button" class="gallery-nav prev" data-lightbox-prev aria-label="Προηγούμενη">‹</button>
+  <img alt="" data-lightbox-img>
+  <button type="button" class="gallery-nav next" data-lightbox-next aria-label="Επόμενη">›</button>
+</div>
+<script type="application/json" id="gallery-data"><%- JSON.stringify(imgs).replace(/</g, '\\u003c') %></script>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,51 @@
+<%- include('_header') %>
+<div class="admin-head">
+  <h1>Πίνακας ελέγχου</h1>
+  <a class="btn btn-brand" href="/admin/cars/new">➕ Νέα αγγελία</a>
+</div>
+
+<div class="stat-grid">
+  <a class="stat" href="/admin/cars?status=active"><span>Ενεργές</span><strong><%= stats.active %></strong></a>
+  <a class="stat" href="/admin/cars?status=reserved"><span>Κρατημένα</span><strong><%= stats.reserved %></strong></a>
+  <a class="stat" href="/admin/cars?status=sold"><span>Πωλήθηκαν</span><strong><%= stats.sold %></strong></a>
+  <a class="stat" href="/admin/cars?status=draft"><span>Πρόχειρα</span><strong><%= stats.draft %></strong></a>
+  <div class="stat"><span>Συνολικές προβολές</span><strong><%= fmt.num(stats.views) %></strong></div>
+  <a class="stat" href="/admin/inquiries"><span>Μηνύματα</span><strong><%= stats.inquiries %></strong></a>
+  <div class="stat stat-wide"><span>Αξία αποθέματος</span><strong><%= fmt.price(stats.stockValue) %></strong></div>
+</div>
+
+<div class="admin-cols">
+  <section class="card">
+    <h2>Τελευταία μηνύματα</h2>
+    <% if (!latestInquiries.length) { %><p class="muted">Δεν υπάρχουν μηνύματα ακόμα.</p><% } %>
+    <ul class="list">
+      <% latestInquiries.forEach(q => { %>
+        <li class="<%= q.is_read ? '' : 'unread' %>">
+          <strong><%= q.name %></strong> <span class="muted small"><%= fmt.date(q.created_at) %></span><br>
+          <span class="small"><%= q.make ? `${q.make} ${q.model}` : 'Γενικό μήνυμα' %> — <%= q.message.slice(0, 80) %><%= q.message.length > 80 ? '…' : '' %></span>
+        </li>
+      <% }) %>
+    </ul>
+    <a href="/admin/inquiries" class="small">Όλα τα μηνύματα →</a>
+  </section>
+
+  <section class="card">
+    <h2>Δημοφιλέστερες αγγελίες</h2>
+    <% if (!topViewed.length) { %><p class="muted">Δεν υπάρχουν αγγελίες ακόμα. <a href="/admin/cars/new">Προσθέστε την πρώτη!</a></p><% } %>
+    <ul class="list">
+      <% topViewed.forEach(c => { %>
+        <li><a href="/admin/cars/<%= c.id %>/edit"><%= carTitle(c) %></a> <span class="muted small">· <%= c.views %> προβολές · <%= fmt.price(c.price) %></span></li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<% if (noPhotos.length) { %>
+  <section class="card">
+    <h2>⚠️ Αγγελίες χωρίς φωτογραφίες</h2>
+    <ul class="list">
+      <% noPhotos.forEach(c => { %><li><a href="/admin/cars/<%= c.id %>/edit"><%= carTitle(c) %></a></li><% }) %>
+    </ul>
+  </section>
+<% } %>
+<%- include('_footer') %>

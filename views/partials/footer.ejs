@@ -1,0 +1,28 @@
+</main>
+<footer class="footer">
+  <div class="container footer-grid">
+    <div>
+      <strong><%= site.dealer_name %></strong>
+      <p class="muted"><%= site.tagline %></p>
+    </div>
+    <div>
+      <h4>Επικοινωνία</h4>
+      <p><%= site.address %><%= site.city ? `, ${site.city}` : '' %></p>
+      <% if (site.phone) { %><p><a href="tel:<%= site.phone.replace(/\s/g, '') %>"><%= site.phone %></a></p><% } %>
+      <% if (site.mobile) { %><p><a href="tel:<%= site.mobile.replace(/\s/g, '') %>"><%= site.mobile %></a></p><% } %>
+      <% if (site.email) { %><p><a href="mailto:<%= site.email %>"><%= site.email %></a></p><% } %>
+    </div>
+    <div>
+      <h4>Ωράριο</h4>
+      <p class="pre"><%= site.hours %></p>
+      <p class="social">
+        <% if (site.facebook) { %><a href="<%= site.facebook %>" target="_blank" rel="noopener">Facebook</a><% } %>
+        <% if (site.instagram) { %><a href="<%= site.instagram %>" target="_blank" rel="noopener">Instagram</a><% } %>
+      </p>
+    </div>
+  </div>
+  <div class="container footer-bottom muted">© <%= new Date().getFullYear() %> <%= site.dealer_name %> · <a href="/admin">Διαχείριση</a></div>
+</footer>
+<script src="/static/js/site.js" defer></script>
+</body>
+</html>
