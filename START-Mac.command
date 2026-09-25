@@ -8,7 +8,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 [ -d node_modules ] || npm install --omit=dev || exit 1
 echo
-echo "Το site ανοίγει στο http://localhost:3000   (Admin: http://localhost:3000/admin)"
+echo "Το site ανοίγει στο http://localhost:30000   (Admin: http://localhost:30000/admin)"
 echo "Κλείστε αυτό το παράθυρο για να σταματήσει."
-(sleep 2 && open http://localhost:3000) &
+(sleep 2 && open http://localhost:30000) &
 npm start

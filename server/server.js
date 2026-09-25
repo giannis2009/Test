@@ -12,7 +12,7 @@ const constants = require('./constants');
 const { icon } = require('./icons');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 30000;
 const isProd = process.env.NODE_ENV === 'production';
 
 function sessionSecret() {

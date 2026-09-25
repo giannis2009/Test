@@ -15,9 +15,9 @@ if not exist node_modules (
   if errorlevel 1 ( pause & exit /b 1 )
 )
 echo.
-echo Το site ανοίγει στο http://localhost:3000   (Admin: http://localhost:3000/admin)
+echo Το site ανοίγει στο http://localhost:30000   (Admin: http://localhost:30000/admin)
 echo Κλείστε αυτό το παράθυρο για να σταματήσει.
 echo.
-start "" http://localhost:3000
+start "" http://localhost:30000
 call npm start
 pause
