@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.applefx.premiere" ExtensionBundleVersion="1.0.0"
+  ExtensionBundleName="AppleFX" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ExtensionList>
+    <Extension Id="com.applefx.premiere.panel" Version="1.0.0" />
+  </ExtensionList>
+  <ExecutionEnvironment>
+    <HostList>
+      <!-- Premiere Pro 2021 (15.0) and newer -->
+      <Host Name="PPRO" Version="[15.0,99.9]" />
+    </HostList>
+    <LocaleList>
+      <Locale Code="All" />
+    </LocaleList>
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="9.0" />
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="com.applefx.premiere.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <ScriptPath>./jsx/host.jsx</ScriptPath>
+          <CEFCommandLine />
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>AppleFX</Menu>
+          <Geometry>
+            <Size>
+              <Height>820</Height>
+              <Width>400</Width>
+            </Size>
+            <MinSize>
+              <Height>400</Height>
+              <Width>280</Width>
+            </MinSize>
+            <MaxSize>
+              <Height>2000</Height>
+              <Width>1200</Width>
+            </MaxSize>
+          </Geometry>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>
