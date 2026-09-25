@@ -59,11 +59,8 @@
     return s;
   }
 
-  function curveValues(s) {
-    if (s.curve === 'custom-bezier') return s.bezier;
-    if (s.curve === 'custom-spring') return s.spring;
-    return null;
-  }
+  // Edited curve values (bezier handles or [response, damping]) from the panel.
+  function curveValues(s) { return s.edit || null; }
 
   // Scale a "from" state's distance from rest by k (intensity); opacity and crop are left alone.
   function scaleState(st, rest, k, onlyBlur) {

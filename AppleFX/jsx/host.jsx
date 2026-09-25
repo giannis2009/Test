@@ -312,7 +312,7 @@ var AppleFX = (function () {
   }
 
   // ------------------------------------------------------------ public API
-  function ping() { return ok({ version: '1.0.0', app: app.version }); }
+  function ping() { return ok({ version: '1.1.0', app: app.version }); }
 
   function getContext() {
     try {

@@ -8,60 +8,61 @@
 </head>
 <body>
   <div class="app">
-    <header class="top">
-      <div class="brand">
-        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
-          <defs>
-            <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#5ac8fa"/><stop offset="0.5" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/>
-            </linearGradient>
-          </defs>
-          <rect x="1" y="1" width="30" height="30" rx="8" fill="url(#lg)"/>
-          <path d="M16 6.5c.9 4.6 2.9 6.6 7.5 7.5-4.6.9-6.6 2.9-7.5 7.5-.9-4.6-2.9-6.6-7.5-7.5 4.6-.9 6.6-2.9 7.5-7.5z" fill="#fff"/>
-          <circle cx="23.5" cy="23.5" r="2" fill="#fff" opacity=".85"/>
-        </svg>
-        <div>
-          <div class="name">AppleFX</div>
-          <div class="sub">Apple-style motion for Premiere Pro</div>
-        </div>
-      </div>
-      <span id="hostPill" class="pill">…</span>
+    <header class="topbar">
+      <svg class="logo" viewBox="0 0 32 32" aria-label="AppleFX">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#5ac8fa"/><stop offset=".55" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/>
+          </linearGradient>
+        </defs>
+        <rect x="2" y="2" width="28" height="28" rx="8" fill="url(#lg)"/>
+        <path d="M16 7.5c.8 4.2 2.6 6 6.8 6.8-4.2.8-6 2.6-6.8 6.8-.8-4.2-2.6-6-6.8-6.8 4.2-.8 6-2.6 6.8-6.8z" fill="#fff"/>
+      </svg>
+      <nav id="toolbar" class="toolbar" role="tablist" aria-label="Categories"></nav>
+      <button id="theme" class="round-btn" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      </button>
     </header>
 
-    <nav id="tabs" class="tabs" role="tablist"></nav>
+    <div class="main">
+      <aside class="sidebar">
+        <div class="side-head"><span id="catName">EASING</span><span id="catCount">0</span></div>
+        <ul id="list" class="list" role="listbox" aria-label="Presets"></ul>
+      </aside>
 
-    <section class="stage">
-      <canvas id="preview" class="preview" aria-label="Live preview"></canvas>
-      <div class="stage-bar">
-        <div>
-          <div id="presetName" class="preset-name"></div>
-          <div id="presetDesc" class="preset-desc"></div>
+      <section class="detail">
+        <div class="detail-scroll">
+          <div class="stage-top"><button id="resetEdit" class="chip" hidden>Reset</button></div>
+          <div class="stage">
+            <svg id="curve" class="curve" viewBox="0 0 320 210" hidden></svg>
+            <canvas id="preview" class="preview" hidden></canvas>
+            <button id="replay" class="replay" title="Replay" aria-label="Replay preview" hidden>
+              <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+            </button>
+          </div>
+          <div class="info">
+            <div class="title-row">
+              <h2 id="title"></h2>
+              <span id="edited" class="badge" hidden>EDITED</span>
+            </div>
+            <p id="desc" class="desc"></p>
+            <div id="controls"></div>
+            <div id="result" class="result" hidden></div>
+          </div>
         </div>
-        <button id="replay" class="icon-btn" title="Replay preview" aria-label="Replay preview">
-          <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
-        </button>
-      </div>
-    </section>
-
-    <div class="search">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4a6 6 0 1 0 3.9 10.6l4.7 4.7 1.4-1.4-4.7-4.7A6 6 0 0 0 10 4zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>
-      <input id="search" type="search" placeholder="Search presets" autocomplete="off" spellcheck="false">
+        <div class="actionbar">
+          <p id="applyHint" class="apply-hint"></p>
+          <button id="clear" class="round-btn small" title="Clear Motion, Opacity and Transform keyframes on the selected clips" aria-label="Clear keyframes">
+            <svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12l-1 12H7L6 9z"/></svg>
+          </button>
+          <button id="apply" class="apply">Apply</button>
+        </div>
+      </section>
     </div>
 
-    <p id="catHint" class="hint"></p>
-    <div id="grid" class="grid"></div>
-
-    <section class="settings">
-      <h3>Settings</h3>
-      <div id="controls"></div>
-    </section>
-
-    <footer class="bottom">
-      <div id="selection" class="selection">Select clips in the timeline</div>
-      <div class="actions">
-        <button id="reset" class="btn ghost" title="Remove Motion, Opacity and Transform keyframes from the selected clips">Clear</button>
-        <button id="apply" class="btn primary">Apply</button>
-      </div>
+    <footer class="statusbar">
+      <span class="status-left"><i id="dot" class="dot"></i><span id="conn">Connected</span><span class="sep">·</span><span id="sel">0 clips selected</span></span>
+      <span class="status-right">AppleFX 1.1.0<span class="sep">·</span>Premiere Pro</span>
     </footer>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>

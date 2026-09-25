@@ -37,13 +37,21 @@ test('springs: bouncy overshoots, smooth does not', () => {
   assert.ok(maxS <= 1.0001, 'smooth no overshoot ' + maxS);
 });
 
-test('custom curves use the provided values', () => {
-  const f = Easing.make('custom-bezier', [0, 0, 1, 1]);
+test('edited curves use the provided values', () => {
+  const f = Easing.make('apple-default', [0, 0, 1, 1]);
   assert.ok(near(f(0.25), 0.25));
-  const s = Easing.make('custom-spring', [0.4, 0.3]);
+  assert.ok(!near(Easing.make('apple-default')(0.25), 0.25));
+  const s = Easing.make('spring-smooth', [0.4, 0.3]);
   let max = 0;
   for (let p = 0; p <= 1; p += 0.005) max = Math.max(max, s(p));
   assert.ok(max > 1.2);
+});
+
+test('edited easing values reach the baked keyframes', () => {
+  const prm = [{ ci: 1, pi: 1, keys: [[0, 0], [1, 100]] }];
+  const lin = Engine.bakeExisting(prm, { curve: 'apple-default', edit: [0, 0, 1, 1], density: 'full' }, FPS)[0];
+  const mid = lin.keys.find((k) => near(k[0], 0.5, 1e-6));
+  assert.ok(near(mid[1], 50, 0.01));
 });
 
 test('library has 45+ presets across 6 categories with unique ids', () => {

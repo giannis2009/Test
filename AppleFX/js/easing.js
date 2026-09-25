@@ -90,33 +90,34 @@
   // Mirror an ease-out into the matching ease-in (used for exits).
   function mirror(f) { return function (p) { return 1 - f(1 - p); }; }
 
+  // Order = order in the Easing list. Every curve can be edited in the panel
+  // (bezier handles / spring sliders); edits are passed to make() as `values`.
   var CURVES = [
-    { id: 'apple-default', name: 'Apple Default', type: 'bezier', v: [0.25, 0.1, 0.25, 1], desc: 'The system default ease used across Apple UI.' },
-    { id: 'ease-in-out', name: 'Ease In Out', type: 'bezier', v: [0.42, 0, 0.58, 1], desc: 'Symmetric acceleration and deceleration.' },
-    { id: 'ease-out', name: 'Ease Out', type: 'bezier', v: [0, 0, 0.58, 1], desc: 'Starts fast, lands softly. Best for entrances.' },
-    { id: 'ease-in', name: 'Ease In', type: 'bezier', v: [0.42, 0, 1, 1], desc: 'Starts slow, leaves fast. Best for exits.' },
-    { id: 'keynote-smooth', name: 'Keynote Smooth', type: 'bezier', v: [0.16, 1, 0.3, 1], desc: 'Long exponential glide, the classic keynote reveal.' },
-    { id: 'keynote-emphasis', name: 'Keynote Emphasis', type: 'bezier', v: [0.2, 0, 0, 1], desc: 'Confident start with a very soft landing.' },
-    { id: 'ios-sheet', name: 'iOS Sheet', type: 'bezier', v: [0.32, 0.72, 0, 1], desc: 'The curve of a sheet sliding up on iPhone.' },
-    { id: 'dramatic', name: 'Dramatic', type: 'bezier', v: [0.83, 0, 0.17, 1], desc: 'Strong in-out for hero moments and whips.' },
-    { id: 'overshoot', name: 'Overshoot', type: 'bezier', v: [0.34, 1.56, 0.64, 1], desc: 'Goes a little past the target and settles back.' },
-    { id: 'spring-smooth', name: 'Spring · Smooth', type: 'spring', v: [0.5, 1.0], desc: 'Critically damped spring, no bounce.' },
-    { id: 'spring-snappy', name: 'Spring · Snappy', type: 'spring', v: [0.5, 0.85], desc: 'Quick spring with a hint of bounce.' },
-    { id: 'spring-bouncy', name: 'Spring · Bouncy', type: 'spring', v: [0.5, 0.6], desc: 'Playful spring that overshoots and settles.' },
-    { id: 'spring-gentle', name: 'Spring · Gentle', type: 'spring', v: [0.8, 0.9], desc: 'Slow, relaxed spring for large movements.' },
-    { id: 'spring-wobbly', name: 'Spring · Wobbly', type: 'spring', v: [0.6, 0.45], desc: 'Loose spring with visible oscillation.' },
-    { id: 'custom-bezier', name: 'Custom Bezier', type: 'bezier', custom: true, v: [0.25, 0.1, 0.25, 1], desc: 'Your own cubic-bezier control points.' },
-    { id: 'custom-spring', name: 'Custom Spring', type: 'spring', custom: true, v: [0.5, 0.8], desc: 'Your own response and damping.' }
+    { id: 'apple-default', name: 'Apple Standard', type: 'bezier', v: [0.4, 0, 0.2, 1], desc: 'Default UI motion' },
+    { id: 'keynote-emphasis', name: 'Emphasized', type: 'bezier', v: [0.2, 0, 0, 1], desc: 'Pronounced curve' },
+    { id: 'ease-out', name: 'Decelerated', type: 'bezier', v: [0, 0, 0.2, 1], desc: 'For entering elements' },
+    { id: 'ease-in', name: 'Accelerated', type: 'bezier', v: [0.4, 0, 1, 1], desc: 'For exiting elements' },
+    { id: 'spring-snappy', name: 'Spring \u00b7 Soft', type: 'spring', v: [0.5, 0.8], desc: 'Gentle overshoot' },
+    { id: 'spring-bouncy', name: 'Spring \u00b7 Bouncy', type: 'spring', v: [0.5, 0.6], desc: 'Lively bounce' },
+    { id: 'overshoot', name: 'Snap', type: 'bezier', v: [0.34, 1.56, 0.64, 1], desc: 'Overshoot and settle' },
+    { id: 'anticipate', name: 'Anticipate', type: 'bezier', v: [0.68, -0.6, 0.32, 1.6], desc: 'Wind-up before motion' },
+    { id: 'spring-wobbly', name: 'Bouncy', type: 'spring', v: [0.6, 0.35], desc: 'Soft elastic feel' },
+    { id: 'keynote-smooth', name: 'Keynote Smooth', type: 'bezier', v: [0.16, 1, 0.3, 1], desc: 'Long exponential glide' },
+    { id: 'ios-sheet', name: 'iOS Sheet', type: 'bezier', v: [0.32, 0.72, 0, 1], desc: 'Sheet sliding up' },
+    { id: 'ease-in-out', name: 'Ease In Out', type: 'bezier', v: [0.42, 0, 0.58, 1], desc: 'Symmetric in and out' },
+    { id: 'dramatic', name: 'Dramatic', type: 'bezier', v: [0.83, 0, 0.17, 1], desc: 'Hero moments and whips' },
+    { id: 'spring-smooth', name: 'Spring \u00b7 Smooth', type: 'spring', v: [0.5, 1.0], desc: 'No bounce, just smooth' },
+    { id: 'spring-gentle', name: 'Spring \u00b7 Gentle', type: 'spring', v: [0.8, 0.9], desc: 'Slow and relaxed' }
   ];
 
   var byId = {};
   CURVES.forEach(function (c) { byId[c.id] = c; });
 
   var cache = {};
-  // Build the curve function. `values` overrides v for custom curves.
+  // Build the curve function. `values` (edited handles / spring) override the preset's own.
   function make(id, values) {
     var def = byId[id] || byId['apple-default'];
-    var v = (def.custom && values) ? values : def.v;
+    var v = (values && values.length === def.v.length) ? values : def.v;
     var key = def.type + ':' + v.join(',');
     if (cache[key]) return cache[key];
     var f = def.type === 'spring'

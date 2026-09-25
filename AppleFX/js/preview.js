@@ -266,8 +266,7 @@
   // ------------------------------------------------------------ easing graph
   function drawEase(pv, g, W, H, t) {
     var s = pv.settings;
-    var vals = s.curve === 'custom-bezier' ? s.bezier : (s.curve === 'custom-spring' ? s.spring : null);
-    var f = Easing.make(s.curve, vals);
+    var f = Easing.make(s.curve, s.edit);
     black(g, W, H);
     var pad = H * 0.12, gx = pad * 1.2, gy = pad, gw = W * 0.5 - gx, gh = H - pad * 2;
     var lo = -0.15, hi = 1.3;

@@ -38,14 +38,8 @@
   // ---------------------------------------------------------------- Easing
   Easing.CURVES.forEach(function (c) {
     P.push({
-      id: 'ease-' + c.id, cat: 'easing', kind: 'ease', name: c.name, desc: c.desc, curve: c.id,
-      custom: c.custom ? c.type : null,
-      defaults: {
-        curve: c.id,
-        bezier: c.type === 'bezier' ? c.v.slice() : [0.25, 0.1, 0.25, 1],
-        spring: c.type === 'spring' ? c.v.slice() : [0.5, 0.8],
-        minGap: 3
-      }
+      id: 'ease-' + c.id, cat: 'easing', kind: 'ease', name: c.name, desc: c.desc, curve: c.id, curveType: c.type,
+      defaults: { curve: c.id, minGap: 3 }
     });
   });
 

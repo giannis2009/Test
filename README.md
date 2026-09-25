@@ -1,11 +1,13 @@
 # AppleFX — Apple-style motion για Premiere Pro
 
 Panel (CEP extension) για **Adobe Premiere Pro 2021+** (Windows & macOS) που φέρνει καθαρό, “Apple / Keynote” motion με ένα κλικ:
-**66 presets** σε 6 κατηγορίες, live preview και ρυθμίσεις για κάθε preset.
+**65 presets** σε 6 κατηγορίες, live preview και ρυθμίσεις για κάθε preset.
+
+Το panel έχει: εικονίδια κατηγοριών πάνω, λίστα presets αριστερά (με αστεράκι για αγαπημένα), graph καμπύλης με handles που σέρνεις (ή sliders Bounces/Settle για springs), κουμπί Apply κάτω, status bar και light/dark mode.
 
 | Κατηγορία | Presets | Τι κάνει |
 |---|---|---|
-| **Easing** | 16 | Apple curves (Apple Default, Keynote Smooth, iOS Sheet, Overshoot…) και springs (Smooth, Snappy, Bouncy, Gentle, Wobbly) + Custom Bezier / Custom Spring. Εφαρμόζονται **στα keyframes που ήδη έχεις** (Position, Scale, Opacity, και σε οποιοδήποτε effect). |
+| **Easing** | 15 | Apple Standard, Emphasized, Decelerated, Accelerated, Spring · Soft, Spring · Bouncy, Snap, Anticipate, Bouncy, Keynote Smooth, iOS Sheet κ.ά. Κάθε καμπύλη αλλάζει: σέρνεις τα μπλε handles ή γράφεις `cubic-bezier(...)`, και στα springs ρυθμίζεις Bounces/Settle (EDITED / Reset). Εφαρμόζονται **στα keyframes που ήδη έχεις** (Position, Scale, Opacity, και σε οποιοδήποτε effect). |
 | **Text** | 12 | Keynote-style reveals: Fade Up, Blur In, Keynote Rise, Scale Pop, Zoom Blur, Slide, Drop In, Wipe Reveal, Wipe Up, Tilt In, Soft Focus. Εφαρμόζονται ως In, Out ή In + Out. |
 | **Transitions** | 11 | Push (4 κατευθύνσεις), Whip Pan, Zoom Through, Blur Cut, Spin, Keynote Dissolve, Stack Slide, Dip To Black, με πραγματικό motion blur. |
 | **Glass** | 9 | Frosted glass: Frosted, Dark, Glass Card, Bottom Bar, Sidebar, Menu Bar, Card Pop, Notification, Blur In. |
