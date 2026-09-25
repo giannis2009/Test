@@ -1,0 +1,32 @@
+<%- include('../partials/head.html') %>
+<body class="admin-body">
+<div class="admin-shell">
+  <aside class="admin-side" id="admin-side">
+    <a class="admin-brand" href="/admin"><img src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>"><small>Admin Panel</small></a>
+    <nav class="admin-nav">
+      <span class="nav-label">Κύρια</span>
+      <a href="/admin" class="<%= path === '/' ? 'active' : '' %>"><%- icon('dashboard') %><span>Πίνακας ελέγχου</span></a>
+      <a href="/admin/cars" class="<%= path === '/cars' || /^\/cars\/\d+/.test(path) ? 'active' : '' %>"><%- icon('car') %><span>Αγγελίες</span></a>
+      <a href="/admin/cars/new" class="<%= path === '/cars/new' ? 'active' : '' %>"><%- icon('plus') %><span>Νέα αγγελία</span></a>
+      <a href="/admin/inquiries" class="<%= path === '/inquiries' ? 'active' : '' %>"><%- icon('message') %><span>Μηνύματα</span><% if (unreadCount) { %><span class="pill"><%= unreadCount %></span><% } %></a>
+      <span class="nav-label">Ρυθμίσεις</span>
+      <a href="/admin/settings" class="<%= path === '/settings' ? 'active' : '' %>"><%- icon('building') %><span>Στοιχεία εμπόρου</span></a>
+      <a href="/admin/backups" class="<%= path === '/backups' ? 'active' : '' %>"><%- icon('save') %><span>Αποθήκευση αλλαγών</span></a>
+      <a href="/admin/account" class="<%= path === '/account' ? 'active' : '' %>"><%- icon('key') %><span>Λογαριασμός</span></a>
+    </nav>
+    <div class="admin-side-foot">
+      <a href="/" target="_blank" rel="noopener"><%- icon('external') %> Προβολή site</a>
+      <form method="post" action="/admin/logout">
+        <input type="hidden" name="_csrf" value="<%= csrf() %>">
+        <button class="linklike"><%- icon('logout') %> Αποσύνδεση</button>
+      </form>
+    </div>
+  </aside>
+  <div class="admin-content">
+    <header class="admin-topbar">
+      <button class="icon-btn admin-menu" type="button" data-admin-menu aria-label="Μενού"><%- icon('menu') %></button>
+      <div class="admin-topbar-title"><%= title %></div>
+      <div class="admin-user"><span class="avatar"><%= user.username.charAt(0).toUpperCase() %></span><span><%= user.username %></span></div>
+    </header>
+    <main class="admin-main">
+      <% flashes.forEach(f => { %><div class="alert alert-<%= f.type %>"><%= f.message %></div><% }) %>

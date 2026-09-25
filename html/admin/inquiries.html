@@ -1,0 +1,56 @@
+<%- include('_header.html') %>
+<div class="admin-head">
+  <div>
+    <h1>Μηνύματα πελατών</h1>
+    <p class="muted"><%= unreadCount %> αδιάβαστα</p>
+  </div>
+</div>
+
+<nav class="tabs">
+  <a href="/admin/inquiries" class="<%= !type ? 'active' : '' %>">Όλα <span><%= typeCounts.all %></span></a>
+  <% Object.entries(C.INQUIRY_TYPES).forEach(([k, v]) => { %>
+    <a href="/admin/inquiries?type=<%= k %>" class="<%= type === k ? 'active' : '' %>"><%= v %> <span><%= typeCounts[k] || 0 %></span></a>
+  <% }) %>
+</nav>
+
+<% if (!inquiries.length) { %>
+  <div class="card empty"><span class="empty-ic"><%- icon('message') %></span><h3>Δεν υπάρχουν μηνύματα</h3><p class="muted">Τα μηνύματα από τις φόρμες του site θα εμφανίζονται εδώ.</p></div>
+<% } %>
+
+<div class="inquiries">
+<% inquiries.forEach(q => { const details = q.details ? JSON.parse(q.details) : null; %>
+  <article class="card inquiry <%= q.is_read ? '' : 'unread' %>">
+    <header>
+      <span class="avatar"><%= q.name.charAt(0).toUpperCase() %></span>
+      <div class="inquiry-who">
+        <strong><%= q.name %></strong> <span class="type-tag type-<%= q.type %>"><%= C.INQUIRY_TYPES[q.type] || q.type %></span>
+        <% if (!q.is_read) { %><span class="pill">Νέο</span><% } %>
+        <div class="muted small"><%= fmt.date(q.created_at) %></div>
+      </div>
+      <div class="inquiry-contact">
+        <% if (q.phone) { %><a class="btn btn-light btn-sm" href="tel:<%= fmt.tel(q.phone) %>"><%- icon('phone') %> <%= q.phone %></a><% } %>
+        <% if (q.email) { %><a class="btn btn-light btn-sm" href="mailto:<%= q.email %>?subject=<%= encodeURIComponent(q.make ? `${q.make} ${q.model}` : site.dealer_name) %>"><%- icon('mail') %> <%= q.email %></a><% } %>
+      </div>
+    </header>
+    <% if (q.cid) { %><div class="inquiry-car small"><%- icon('car') %> <a href="/admin/cars/<%= q.cid %>/edit"><%= [q.make, q.model, q.version].filter(Boolean).join(' ') %></a></div><% } %>
+    <% if (details) { %>
+      <dl class="details">
+        <% Object.entries(details).forEach(([k, v]) => { %><div><dt><%= k %></dt><dd><%= v %></dd></div><% }) %>
+      </dl>
+    <% } %>
+    <p class="pre"><%= q.message %></p>
+    <footer class="row-actions">
+      <form method="post" action="/admin/inquiries/<%= q.id %>/read">
+        <input type="hidden" name="_csrf" value="<%= csrf() %>">
+        <input type="hidden" name="read" value="<%= q.is_read ? '0' : '1' %>">
+        <button class="btn btn-light btn-sm"><%- icon('check') %> <%= q.is_read ? 'Σήμανση ως αδιάβαστο' : 'Σήμανση ως διαβασμένο' %></button>
+      </form>
+      <form method="post" action="/admin/inquiries/<%= q.id %>/delete" data-confirm="Διαγραφή του μηνύματος;">
+        <input type="hidden" name="_csrf" value="<%= csrf() %>">
+        <button class="btn btn-danger btn-sm"><%- icon('trash') %> Διαγραφή</button>
+      </form>
+    </footer>
+  </article>
+<% }) %>
+</div>
+<%- include('_footer.html') %>

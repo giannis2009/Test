@@ -1,0 +1,32 @@
+<article class="car-card<%= car.status === 'sold' ? ' is-sold' : '' %>" data-car-id="<%= car.id %>">
+  <a href="<%= carUrl(car) %>" class="car-card-img">
+    <img loading="lazy" src="<%= car.cover ? `/uploads/${car.cover}` : '/images/no-photo.svg' %>" alt="<%= carTitle(car) %>">
+    <span class="badges">
+      <% if (car.featured) { %><span class="badge badge-brand"><%- icon('star') %> Προτεινόμενο</span><% } %>
+      <% if (car.status === 'reserved') { %><span class="badge badge-warn">Κρατημένο</span><% } %>
+      <% if (car.status === 'sold') { %><span class="badge badge-dark">Πωλήθηκε</span><% } %>
+      <% if (car.condition === 'Καινούργιο') { %><span class="badge badge-ok">Καινούργιο</span><% } %>
+    </span>
+    <% if (car.image_count) { %><span class="photo-count"><%- icon('camera') %> <%= car.image_count %></span><% } %>
+  </a>
+  <button type="button" class="fav-btn" data-fav="<%= car.id %>" aria-label="Προσθήκη στα αγαπημένα" aria-pressed="false"><%- icon('heart') %></button>
+  <div class="car-card-body">
+    <h3 class="car-card-title"><a href="<%= carUrl(car) %>"><%= car.make %> <%= car.model %></a></h3>
+    <div class="car-card-version"><%= car.version || ' ' %></div>
+    <ul class="car-card-specs">
+      <li><%- icon('calendar') %><%= fmt.reg(car) %></li>
+      <li><%- icon('gauge') %><%= fmt.km(car.mileage) %></li>
+      <li><%- icon('fuel') %><%= car.fuel || '—' %></li>
+      <li><%- icon('gear') %><%= car.gearbox || '—' %></li>
+      <% if (car.power_hp) { %><li><%- icon('bolt') %><%= car.power_hp %> hp</li><% } %>
+      <% if (car.engine_cc) { %><li><%- icon('engine') %><%= fmt.num(car.engine_cc) %> cc</li><% } %>
+    </ul>
+    <div class="car-card-foot">
+      <div>
+        <span class="price"><%= fmt.price(car.price) %></span>
+        <% if (car.vat_deductible) { %><span class="price-note">ΦΠΑ εκπίπτει</span><% } else if (car.price_negotiable) { %><span class="price-note">Συζητήσιμη</span><% } %>
+      </div>
+      <a class="card-more" href="<%= carUrl(car) %>" aria-label="Προβολή <%= carTitle(car) %>"><%- icon('arrow') %></a>
+    </div>
+  </div>
+</article>

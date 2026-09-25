@@ -1,0 +1,91 @@
+<%- include('_header.html') %>
+<div class="admin-head">
+  <div>
+    <h1>Αγγελίες</h1>
+    <p class="muted"><%= total %> <%= total === 1 ? 'αγγελία' : 'αγγελίες' %></p>
+  </div>
+  <a class="btn btn-brand" href="/admin/cars/new"><%- icon('plus') %> Νέα αγγελία</a>
+</div>
+
+<nav class="tabs">
+  <a href="/admin/cars<%= qs(query, { status: '', page: '' }) %>" class="<%= !query.status ? 'active' : '' %>">Όλες <span><%= counts.all %></span></a>
+  <% Object.entries(C.STATUSES).forEach(([k, v]) => { %>
+    <a href="/admin/cars<%= qs(query, { status: k, page: '' }) %>" class="<%= query.status === k ? 'active' : '' %>"><%= v %> <span><%= counts[k] || 0 %></span></a>
+  <% }) %>
+</nav>
+
+<form method="get" class="toolbar">
+  <% if (query.status) { %><input type="hidden" name="status" value="<%= query.status %>"><% } %>
+  <div class="input-icon grow"><%- icon('search') %><input type="search" name="q" value="<%= query.q || '' %>" placeholder="Αναζήτηση μάρκας, μοντέλου, έκδοσης…"></div>
+  <select name="sort" data-autosubmit>
+    <% [['recent', 'Νεότερες πρώτα'], ['price_desc', 'Τιμή: υψηλή → χαμηλή'], ['price_asc', 'Τιμή: χαμηλή → υψηλή'], ['year_desc', 'Έτος: νεότερα']].forEach(([k, v]) => { %><option value="<%= k %>" <%= sort === k ? 'selected' : '' %>><%= v %></option><% }) %>
+  </select>
+  <button class="btn btn-light"><%- icon('search') %> Αναζήτηση</button>
+</form>
+
+<% if (!cars.length) { %>
+  <div class="card empty">
+    <span class="empty-ic"><%- icon('car') %></span>
+    <h3>Δεν βρέθηκαν αγγελίες</h3>
+    <a class="btn btn-brand" href="/admin/cars/new"><%- icon('plus') %> Προσθήκη αυτοκινήτου</a>
+  </div>
+<% } else { %>
+<div class="table-wrap">
+<table class="table">
+  <thead>
+    <tr><th>Αυτοκίνητο</th><th>Τιμή</th><th>Έτος / km</th><th>Προβολές</th><th>Κατάσταση</th><th class="center">★</th><th></th></tr>
+  </thead>
+  <tbody>
+  <% cars.forEach(car => { %>
+    <tr>
+      <td data-label="Αυτοκίνητο">
+        <div class="car-cell">
+          <img class="thumb" src="<%= car.cover ? `/uploads/${car.cover}` : '/images/no-photo.svg' %>" alt="">
+          <div>
+            <a href="/admin/cars/<%= car.id %>/edit"><strong><%= car.make %> <%= car.model %></strong></a>
+            <div class="muted small"><%= car.version || '—' %></div>
+            <div class="muted small">#<%= car.id %> · <%- icon('camera') %> <%= car.image_count %></div>
+          </div>
+        </div>
+      </td>
+      <td data-label="Τιμή"><strong><%= fmt.price(car.price) %></strong></td>
+      <td data-label="Έτος / km"><%= fmt.reg(car) %><div class="muted small"><%= fmt.km(car.mileage) %></div></td>
+      <td data-label="Προβολές"><%- icon('eye') %> <%= car.views %></td>
+      <td data-label="Κατάσταση">
+        <form method="post" action="/admin/cars/<%= car.id %>/status">
+          <input type="hidden" name="_csrf" value="<%= csrf() %>">
+          <select name="status" class="status-select status-<%= car.status %>" data-autosubmit>
+            <% Object.entries(C.STATUSES).forEach(([k, v]) => { %><option value="<%= k %>" <%= car.status === k ? 'selected' : '' %>><%= v %></option><% }) %>
+          </select>
+        </form>
+      </td>
+      <td data-label="Προτεινόμενο" class="center">
+        <form method="post" action="/admin/cars/<%= car.id %>/status">
+          <input type="hidden" name="_csrf" value="<%= csrf() %>">
+          <input type="hidden" name="featured" value="<%= car.featured ? '0' : '1' %>">
+          <button class="star <%= car.featured ? 'on' : '' %>" title="<%= car.featured ? 'Αφαίρεση από προτεινόμενα' : 'Ορισμός ως προτεινόμενο' %>"><%- icon('star') %></button>
+        </form>
+      </td>
+      <td class="actions-cell"><div class="row-actions">
+        <a class="icon-btn" href="/admin/cars/<%= car.id %>/edit" title="Επεξεργασία"><%- icon('edit') %></a>
+        <a class="icon-btn" href="/admin/preview/<%= car.id %>" target="_blank" title="Προβολή στο site"><%- icon('external') %></a>
+        <a class="icon-btn" href="/admin/cars/new?from=<%= car.id %>" title="Αντιγραφή σε νέα αγγελία"><%- icon('copy') %></a>
+        <form method="post" action="/admin/cars/<%= car.id %>/delete" data-confirm="Διαγραφή της αγγελίας «<%= car.make %> <%= car.model %>»;">
+          <input type="hidden" name="_csrf" value="<%= csrf() %>">
+          <button class="icon-btn danger" title="Διαγραφή"><%- icon('trash') %></button>
+        </form>
+        </div>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+
+<% if (pages > 1) { %>
+  <nav class="pagination">
+    <% for (let p = 1; p <= pages; p++) { %><a href="/admin/cars<%= qs(query, { page: p }) %>" class="<%= p === page ? 'current' : '' %>"><%= p %></a><% } %>
+  </nav>
+<% } %>
+<%- include('_footer.html') %>

@@ -1,0 +1,213 @@
+<%
+  const title2 = carTitle(car);
+  const specs = [
+    ['calendar', 'Χρονολογία', fmt.reg(car)],
+    ['gauge', 'Χιλιόμετρα', car.mileage != null ? fmt.km(car.mileage) : null],
+    ['fuel', 'Καύσιμο', car.fuel],
+    ['engine', 'Κυβικά', car.engine_cc ? `${fmt.num(car.engine_cc)} cc` : null],
+    ['bolt', 'Ιπποδύναμη', car.power_hp ? `${car.power_hp} hp` : null],
+    ['gear', 'Σασμάν', car.gearbox],
+    ['car', 'Κίνηση', car.drivetrain],
+    ['tag', 'Κατηγορία', car.category],
+    ['car', 'Αμάξωμα', car.body_type],
+    ['info', 'Κατάσταση', car.condition],
+    ['door', 'Πόρτες', car.doors],
+    ['seat', 'Θέσεις', car.seats],
+    ['palette', 'Χρώμα', car.color],
+    ['palette', 'Χρώμα εσωτερικού', car.interior_color],
+    ['users', 'Προηγούμενοι ιδιοκτήτες', car.previous_owners],
+    ['leaf', 'Κλάση ρύπων', car.emission_class],
+    ['leaf', 'Εκπομπές CO₂', car.co2 ? `${car.co2} g/km` : null],
+    ['fuel', 'Κατανάλωση', car.consumption ? `${String(car.consumption).replace('.', ',')} l/100km` : null],
+  ].filter(([, , v]) => v !== null && v !== undefined && v !== '' && v !== '—');
+  const keyFacts = [
+    ['calendar', 'Χρονολογία', fmt.reg(car)],
+    ['gauge', 'Χιλιόμετρα', fmt.km(car.mileage)],
+    ['fuel', 'Καύσιμο', car.fuel || '—'],
+    ['gear', 'Σασμάν', car.gearbox || '—'],
+    ['bolt', 'Ισχύς', car.power_hp ? `${car.power_hp} hp` : '—'],
+    ['engine', 'Κυβικά', car.engine_cc ? `${fmt.num(car.engine_cc)} cc` : '—'],
+  ];
+  const imgs = car.images.length ? car.images.map(i => `/uploads/${i.filename}`) : ['/images/no-photo.svg'];
+  const url = baseUrl + carUrl(car);
+  const shareText = `${title2} – ${fmt.price(car.price)}`;
+  const jsonLd = {
+    '@context': 'https://schema.org', '@type': 'Car', name: title2, brand: { '@type': 'Brand', name: car.make }, model: car.model,
+    vehicleModelDate: car.year ? String(car.year) : undefined, fuelType: car.fuel || undefined, color: car.color || undefined,
+    mileageFromOdometer: car.mileage != null ? { '@type': 'QuantitativeValue', value: car.mileage, unitCode: 'KMT' } : undefined,
+    image: car.images.map(i => `${baseUrl}/uploads/${i.filename}`), url,
+    offers: car.price ? { '@type': 'Offer', price: car.price, priceCurrency: 'EUR', availability: car.status === 'sold' ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock', seller: { '@type': 'AutoDealer', name: site.dealer_name } } : undefined,
+  };
+%>
+<%- include('partials/header.html', { title: `${title2} – ${fmt.price(car.price)}`, metaDescription: `${title2}, ${fmt.reg(car)}, ${fmt.km(car.mileage)}, ${car.fuel || ''}. ${fmt.price(car.price)}`, ogImage: car.images.length ? imgs[0] : null }) %>
+<script type="application/ld+json"><%- JSON.stringify(jsonLd).replace(/</g, '\\u003c') %></script>
+
+<div class="container car-top">
+  <nav class="crumbs" aria-label="Διαδρομή">
+    <a href="/">Αρχική</a><span>/</span><a href="/cars">Αυτοκίνητα</a><span>/</span>
+    <a href="/cars?make=<%= encodeURIComponent(car.make) %>"><%= car.make %></a><span>/</span><span><%= car.model %></span>
+  </nav>
+  <div class="car-top-actions">
+    <% if (user) { %><a class="btn btn-light btn-sm" href="/admin/cars/<%= car.id %>/edit"><%- icon('edit') %> Επεξεργασία</a><% } %>
+    <button type="button" class="btn btn-light btn-sm fav-toggle" data-fav="<%= car.id %>" aria-pressed="false"><%- icon('heart') %> <span data-fav-label>Αποθήκευση</span></button>
+    <button type="button" class="btn btn-light btn-sm" data-share data-share-title="<%= shareText %>" data-share-url="<%= url %>"><%- icon('share') %> Κοινοποίηση</button>
+    <button type="button" class="btn btn-light btn-sm hide-mobile" onclick="window.print()"><%- icon('printer') %> Εκτύπωση</button>
+  </div>
+</div>
+
+<div class="container car-page">
+  <div class="car-main">
+    <div class="gallery" data-gallery>
+      <div class="gallery-main">
+        <img src="<%= imgs[0] %>" alt="<%= title2 %>" data-gallery-main>
+        <% if (imgs.length > 1) { %>
+          <button class="gallery-nav prev" type="button" data-gallery-prev aria-label="Προηγούμενη φωτογραφία">‹</button>
+          <button class="gallery-nav next" type="button" data-gallery-next aria-label="Επόμενη φωτογραφία">›</button>
+        <% } %>
+        <span class="gallery-counter"><%- icon('camera') %> <span data-gallery-counter>1 / <%= imgs.length %></span></span>
+        <% if (car.status === 'sold') { %><span class="ribbon">Πωλήθηκε</span><% } else if (car.status === 'reserved') { %><span class="ribbon ribbon-warn">Κρατημένο</span><% } else if (car.featured) { %><span class="ribbon ribbon-brand"><%- icon('star') %> Προτεινόμενο</span><% } %>
+      </div>
+      <% if (imgs.length > 1) { %>
+        <div class="gallery-thumbs">
+          <% imgs.forEach((src, i) => { %>
+            <button type="button" class="<%= i === 0 ? 'active' : '' %>" data-gallery-thumb="<%= i %>" aria-label="Φωτογραφία <%= i + 1 %>"><img loading="lazy" src="<%= src %>" alt=""></button>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="key-facts">
+      <% keyFacts.forEach(([ic, k, v]) => { %>
+        <div class="key-fact"><%- icon(ic) %><span><%= k %></span><strong><%= v %></strong></div>
+      <% }) %>
+    </div>
+
+    <% if (car.service_book || car.no_accident) { %>
+      <div class="trust-badges">
+        <% if (car.service_book) { %><span><%- icon('check') %> Βιβλίο service</span><% } %>
+        <% if (car.no_accident) { %><span><%- icon('check') %> Χωρίς ατύχημα</span><% } %>
+        <span><%- icon('shield') %> Εγγύηση <%= site.warranty_months %> μηνών</span>
+        <span><%- icon('wrench') %> Τεχνικά ελεγμένο</span>
+      </div>
+    <% } %>
+
+    <section class="card">
+      <h2>Τεχνικά χαρακτηριστικά</h2>
+      <dl class="spec-table">
+        <% specs.forEach(([ic, k, v]) => { %><div><dt><%- icon(ic) %><%= k %></dt><dd><%= v %></dd></div><% }) %>
+      </dl>
+    </section>
+
+    <% if (car.featureList.length) { %>
+      <section class="card">
+        <h2>Εξοπλισμός</h2>
+        <ul class="feature-list">
+          <% car.featureList.forEach(f => { %><li><%- icon('check') %><%= f %></li><% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <% if (car.description) { %>
+      <section class="card">
+        <h2>Περιγραφή</h2>
+        <div class="pre description"><%= car.description %></div>
+      </section>
+    <% } %>
+
+    <% if (site.finance_enabled === '1' && car.price && car.status !== 'sold') { %>
+      <section class="card finance-calc" data-finance data-price="<%= car.price %>" data-rate="<%= site.finance_rate %>">
+        <h2><%- icon('wallet') %> Υπολογισμός δόσεων</h2>
+        <div class="finance-grid">
+          <label class="field"><span>Προκαταβολή: <strong data-down-label></strong></span>
+            <input type="range" min="0" max="<%= Math.round(car.price * 0.7) %>" step="500" value="<%= Math.round(car.price * 0.3 / 500) * 500 %>" data-down>
+          </label>
+          <label class="field"><span>Διάρκεια</span>
+            <select data-months><% [12, 24, 36, 48, 60, 72, 84].forEach(m => { %><option value="<%= m %>" <%= m === 60 ? 'selected' : '' %>><%= m %> μήνες</option><% }) %></select>
+          </label>
+        </div>
+        <div class="finance-result">
+          <div><span>Μηνιαία δόση από</span><strong data-monthly>—</strong></div>
+          <div><span>Ποσό χρηματοδότησης</span><strong data-financed>—</strong></div>
+          <a class="btn btn-brand" href="/finance?car=<%= car.id %>">Αίτηση χρηματοδότησης</a>
+        </div>
+        <p class="muted small">Ενδεικτικός υπολογισμός με επιτόκιο <%= site.finance_rate %>%. Η τελική δόση εξαρτάται από την έγκριση του πιστωτικού φορέα.</p>
+      </section>
+    <% } %>
+  </div>
+
+  <aside class="car-side">
+    <div class="card price-card">
+      <h1 class="car-title"><%= car.make %> <%= car.model %></h1>
+      <% if (car.version) { %><div class="car-subtitle"><%= car.version %></div><% } %>
+      <div class="price-big"><%= fmt.price(car.price) %></div>
+      <div class="price-notes">
+        <% if (car.price_negotiable) { %><span class="chip">Συζητήσιμη</span><% } %>
+        <% if (car.vat_deductible) { %><span class="chip">ΦΠΑ εκπίπτει</span><% } %>
+        <% if (car.condition) { %><span class="chip"><%= car.condition %></span><% } %>
+      </div>
+      <div class="contact-buttons">
+        <% if (site.phone) { %><a class="btn btn-brand btn-block btn-lg" href="tel:<%= fmt.tel(site.phone) %>"><%- icon('phone') %> <%= site.phone %></a><% } %>
+        <% if (site.mobile) { %><a class="btn btn-light btn-block" href="tel:<%= fmt.tel(site.mobile) %>"><%- icon('phone') %> <%= site.mobile %></a><% } %>
+        <div class="btn-row">
+          <% if (site.whatsapp) { %><a class="btn btn-whatsapp" target="_blank" rel="noopener" href="https://wa.me/<%= fmt.tel(site.whatsapp).replace('+', '') %>?text=<%= encodeURIComponent(`Ενδιαφέρομαι για το ${title2} (#${car.id}) ${url}`) %>"><%- icon('whatsapp') %> WhatsApp</a><% } %>
+          <% if (site.viber) { %><a class="btn btn-viber" href="viber://chat?number=<%= encodeURIComponent(fmt.tel(site.viber)) %>"><%- icon('viber') %> Viber</a><% } %>
+        </div>
+        <a class="btn btn-light btn-block" href="#contact"><%- icon('mail') %> Στείλτε μήνυμα</a>
+      </div>
+      <div class="listing-meta"><span>Κωδικός #<%= car.id %></span><span><%- icon('eye') %> <%= car.views %> προβολές</span></div>
+    </div>
+
+    <div class="card" id="contact">
+      <h2>Ενδιαφέρεστε;</h2>
+      <% if (sent) { %><div class="alert alert-success">Ευχαριστούμε! Το μήνυμά σας στάλθηκε και θα επικοινωνήσουμε σύντομα.</div><% } %>
+      <form method="post" action="/car/<%= car.id %>/inquiry" class="stack">
+        <input type="hidden" name="_csrf" value="<%= csrf() %>">
+        <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <label class="field"><span>Ονοματεπώνυμο *</span><input name="name" required maxlength="120" autocomplete="name"></label>
+        <label class="field"><span>Τηλέφωνο</span><input name="phone" type="tel" maxlength="40" autocomplete="tel"></label>
+        <label class="field"><span>Email</span><input name="email" type="email" maxlength="200" autocomplete="email"></label>
+        <label class="field"><span>Μήνυμα *</span><textarea name="message" required rows="4" maxlength="4000">Γεια σας, ενδιαφέρομαι για το <%= title2 %> (#<%= car.id %>). Είναι ακόμη διαθέσιμο;</textarea></label>
+        <button class="btn btn-brand btn-block"><%- icon('mail') %> Αποστολή μηνύματος</button>
+        <p class="muted small">Απαιτείται τηλέφωνο ή email για να σας απαντήσουμε.</p>
+      </form>
+    </div>
+
+    <div class="card dealer-card">
+      <img src="<%= site.logoUrl %>" alt="">
+      <div>
+        <strong><%= site.dealer_name %></strong>
+        <p class="muted small"><%- icon('pin') %> <%= site.address %><%= site.city ? `, ${site.city}` : '' %></p>
+        <p class="pre small"><%= site.hours %></p>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<% if (similar.length) { %>
+<section class="container section">
+  <div class="section-head">
+    <div><span class="kicker">Μπορεί να σας ενδιαφέρουν</span><h2 class="section-title">Παρόμοια αυτοκίνητα</h2></div>
+    <a class="link-arrow" href="/cars">Όλα τα αυτοκίνητα <%- icon('arrow') %></a>
+  </div>
+  <div class="car-grid">
+    <% similar.forEach(c => { %><%- include('partials/car-card.html', { car: c }) %><% }) %>
+  </div>
+</section>
+<% } %>
+
+<div class="mobile-bar">
+  <div><strong><%= fmt.price(car.price) %></strong><span><%= car.make %> <%= car.model %></span></div>
+  <% if (site.phone) { %><a class="btn btn-brand" href="tel:<%= fmt.tel(site.phone) %>"><%- icon('phone') %> Κλήση</a><% } %>
+  <a class="btn btn-light" href="#contact"><%- icon('mail') %></a>
+</div>
+
+<div class="lightbox" data-lightbox hidden>
+  <button type="button" class="lightbox-close" data-lightbox-close aria-label="Κλείσιμο"><%- icon('x') %></button>
+  <button type="button" class="gallery-nav prev" data-lightbox-prev aria-label="Προηγούμενη">‹</button>
+  <img alt="" data-lightbox-img>
+  <button type="button" class="gallery-nav next" data-lightbox-next aria-label="Επόμενη">›</button>
+  <span class="lightbox-counter" data-lightbox-counter></span>
+</div>
+<script type="application/json" id="gallery-data"><%- JSON.stringify(imgs).replace(/</g, '\\u003c') %></script>
+
+<%- include('partials/footer.html') %>

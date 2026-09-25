@@ -1,0 +1,9 @@
+node_modules/
+database/*.db
+database/*.db-*
+data/
+uploads/*
+!uploads/.gitkeep
+save-changes/backups/
+save-changes/deleted-photos/
+.env

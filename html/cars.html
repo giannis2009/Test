@@ -1,0 +1,144 @@
+<%- include('partials/header.html') %>
+<%
+  const labels = { q: 'Αναζήτηση', make: 'Μάρκα', model: 'Μοντέλο', price_min: 'Τιμή από', price_max: 'Τιμή έως', year_min: 'Από', year_max: 'Έως', km_max: 'Έως km', fuel: 'Καύσιμο', gearbox: 'Σασμάν', category: 'Κατηγορία', body_type: 'Αμάξωμα' };
+  const active = Object.keys(labels).filter(k => typeof query[k] === 'string' && query[k] !== '');
+  const show = (k, v) => (k.startsWith('price') ? fmt.price(Number(v)) : k === 'km_max' ? fmt.km(Number(v)) : v);
+%>
+
+<section class="page-hero">
+  <div class="container">
+    <nav class="crumbs" aria-label="Διαδρομή"><a href="/">Αρχική</a><span>/</span><span>Αυτοκίνητα</span></nav>
+    <h1>Αυτοκίνητα προς πώληση</h1>
+    <p><%= total %> <%= total === 1 ? 'αυτοκίνητο ταιριάζει' : 'αυτοκίνητα ταιριάζουν' %> στην αναζήτησή σας</p>
+  </div>
+</section>
+
+<section class="container listing-layout" id="results">
+  <div class="filters-backdrop" data-close-filters></div>
+  <aside class="filters" id="filters" aria-label="Φίλτρα">
+    <form method="get" action="/cars" class="filters-form">
+      <div class="filters-head">
+        <h2><%- icon('filter') %> Φίλτρα</h2>
+        <a href="/cars" class="small">Καθαρισμός</a>
+        <button type="button" class="icon-btn filters-close" data-close-filters aria-label="Κλείσιμο"><%- icon('x') %></button>
+      </div>
+
+      <label class="field">
+        <span>Αναζήτηση</span>
+        <div class="input-icon"><%- icon('search') %><input type="search" name="q" value="<%= query.q || '' %>" placeholder="π.χ. Golf GTI"></div>
+      </label>
+
+      <label class="field">
+        <span>Μάρκα</span>
+        <select name="make" data-make-select>
+          <option value="">Όλες</option>
+          <% facets.makes.forEach(m => { %><option value="<%= m.v %>" <%= query.make === m.v ? 'selected' : '' %>><%= m.v %> (<%= m.n %>)</option><% }) %>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Μοντέλο</span>
+        <select name="model" data-model-select <%= query.make ? '' : 'disabled' %>>
+          <option value="">Όλα</option>
+          <% (facets.modelsByMake[query.make] || []).forEach(m => { %><option value="<%= m.v %>" <%= query.model === m.v ? 'selected' : '' %>><%= m.v %> (<%= m.n %>)</option><% }) %>
+        </select>
+      </label>
+
+      <div class="field">
+        <span>Τιμή (€)</span>
+        <div class="range">
+          <input type="number" name="price_min" min="0" step="500" value="<%= query.price_min || '' %>" placeholder="Από" inputmode="numeric">
+          <input type="number" name="price_max" min="0" step="500" value="<%= query.price_max || '' %>" placeholder="Έως" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="field">
+        <span>Χρονολογία</span>
+        <div class="range">
+          <select name="year_min">
+            <option value="">Από</option>
+            <% for (let y = year + 1; y >= 1990; y--) { %><option <%= String(query.year_min) === String(y) ? 'selected' : '' %>><%= y %></option><% } %>
+          </select>
+          <select name="year_max">
+            <option value="">Έως</option>
+            <% for (let y = year + 1; y >= 1990; y--) { %><option <%= String(query.year_max) === String(y) ? 'selected' : '' %>><%= y %></option><% } %>
+          </select>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Χιλιόμετρα έως</span>
+        <select name="km_max">
+          <option value="">Όλα</option>
+          <% [10000, 25000, 50000, 75000, 100000, 150000, 200000].forEach(k => { %><option value="<%= k %>" <%= String(query.km_max) === String(k) ? 'selected' : '' %>><%= fmt.num(k) %> km</option><% }) %>
+        </select>
+      </label>
+
+      <% [['fuel', 'Καύσιμο', facets.fuels], ['gearbox', 'Σασμάν', facets.gearboxes], ['category', 'Κατηγορία', facets.categories], ['body_type', 'Αμάξωμα', facets.bodyTypes]].forEach(([name, label, opts]) => { if (!opts.length) return; %>
+        <label class="field">
+          <span><%= label %></span>
+          <select name="<%= name %>">
+            <option value="">Όλα</option>
+            <% opts.forEach(o => { %><option value="<%= o.v %>" <%= query[name] === o.v ? 'selected' : '' %>><%= o.v %> (<%= o.n %>)</option><% }) %>
+          </select>
+        </label>
+      <% }) %>
+
+      <input type="hidden" name="sort" value="<%= sort %>">
+      <button class="btn btn-brand btn-block" type="submit"><%- icon('search') %> Εμφάνιση αποτελεσμάτων</button>
+    </form>
+  </aside>
+
+  <div class="results">
+    <div class="results-bar">
+      <button type="button" class="btn btn-light btn-filters" data-open-filters><%- icon('filter') %> Φίλτρα<% if (active.length) { %> <span class="pill"><%= active.length %></span><% } %></button>
+      <div class="results-count"><strong><%= total %></strong> <%= total === 1 ? 'αγγελία' : 'αγγελίες' %></div>
+      <form method="get" action="/cars" class="sort-form">
+        <% Object.entries(query).forEach(([k, v]) => { if (k === 'sort' || k === 'page' || typeof v !== 'string') return; %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }) %>
+        <label><span class="sr-only">Ταξινόμηση</span>
+          <select name="sort" data-autosubmit>
+            <% Object.entries(sortLabels).forEach(([k, label]) => { %><option value="<%= k %>" <%= sort === k ? 'selected' : '' %>><%= label %></option><% }) %>
+          </select>
+        </label>
+      </form>
+      <div class="view-toggle" role="group" aria-label="Προβολή">
+        <button type="button" data-view="grid" aria-label="Πλέγμα" class="active"><%- icon('grid') %></button>
+        <button type="button" data-view="list" aria-label="Λίστα"><%- icon('list') %></button>
+      </div>
+    </div>
+
+    <% if (active.length) { %>
+      <div class="active-filters">
+        <% active.forEach(k => { %>
+          <a class="filter-chip" href="/cars<%= qs(query, { [k]: '', page: '', ...(k === 'make' ? { model: '' } : {}) }) %>"><%= labels[k] %>: <strong><%= show(k, query[k]) %></strong> <%- icon('x') %></a>
+        <% }) %>
+        <a class="filter-chip clear" href="/cars">Καθαρισμός όλων</a>
+      </div>
+    <% } %>
+
+    <% if (!cars.length) { %>
+      <div class="empty card">
+        <span class="empty-ic"><%- icon('search') %></span>
+        <h3>Δεν βρέθηκαν αυτοκίνητα</h3>
+        <p class="muted">Δοκιμάστε να αφαιρέσετε κάποιο φίλτρο ή επικοινωνήστε μαζί μας. Μπορούμε να βρούμε το αυτοκίνητο που ψάχνετε.</p>
+        <div class="hero-cta center"><a class="btn btn-light" href="/cars">Όλα τα αυτοκίνητα</a><a class="btn btn-brand" href="/contact">Επικοινωνία</a></div>
+      </div>
+    <% } else { %>
+      <div class="car-grid" data-car-list>
+        <% cars.forEach(car => { %><%- include('partials/car-card.html', { car }) %><% }) %>
+      </div>
+    <% } %>
+
+    <% if (pages > 1) { %>
+      <nav class="pagination" aria-label="Σελίδες">
+        <% if (page > 1) { %><a href="/cars<%= qs(query, { page: page - 1 }) %>#results" aria-label="Προηγούμενη">‹</a><% } %>
+        <% for (let p = 1; p <= pages; p++) { if (p === 1 || p === pages || Math.abs(p - page) <= 2) { %>
+          <a href="/cars<%= qs(query, { page: p }) %>#results" class="<%= p === page ? 'current' : '' %>"><%= p %></a>
+        <% } else if (Math.abs(p - page) === 3) { %><span>…</span><% } } %>
+        <% if (page < pages) { %><a href="/cars<%= qs(query, { page: page + 1 }) %>#results" aria-label="Επόμενη">›</a><% } %>
+      </nav>
+    <% } %>
+  </div>
+</section>
+
+<%- include('partials/footer.html') %>

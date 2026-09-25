@@ -1,0 +1,46 @@
+<%- include('partials/header.html') %>
+
+<section class="page-hero">
+  <div class="container">
+    <nav class="crumbs" aria-label="Διαδρομή"><a href="/">Αρχική</a><span>/</span><span>Επικοινωνία</span></nav>
+    <h1>Επικοινωνία</h1>
+    <p>Είμαστε εδώ για κάθε ερώτηση: τηλεφωνικά, με μήνυμα ή από κοντά.</p>
+  </div>
+</section>
+
+<div class="container section contact-page">
+  <div class="contact-info">
+    <div class="info-tiles">
+      <div class="info-tile"><span class="why-ic"><%- icon('pin') %></span><div><h3>Διεύθυνση</h3><p><%= site.address %><%= site.city ? `, ${site.city}` : '' %></p></div></div>
+      <% if (site.phone || site.mobile) { %>
+        <div class="info-tile"><span class="why-ic"><%- icon('phone') %></span><div><h3>Τηλέφωνο</h3>
+          <% if (site.phone) { %><p><a href="tel:<%= fmt.tel(site.phone) %>"><%= site.phone %></a></p><% } %>
+          <% if (site.mobile) { %><p><a href="tel:<%= fmt.tel(site.mobile) %>"><%= site.mobile %></a></p><% } %>
+        </div></div>
+      <% } %>
+      <% if (site.email) { %><div class="info-tile"><span class="why-ic"><%- icon('mail') %></span><div><h3>Email</h3><p><a href="mailto:<%= site.email %>"><%= site.email %></a></p></div></div><% } %>
+      <div class="info-tile"><span class="why-ic"><%- icon('clock') %></span><div><h3>Ωράριο</h3><p class="pre"><%= site.hours %></p></div></div>
+    </div>
+    <% const mapQ = site.map_embed_query || `${site.address} ${site.city}`; %>
+    <iframe class="map map-lg" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Χάρτης" src="https://maps.google.com/maps?q=<%= encodeURIComponent(mapQ) %>&output=embed"></iframe>
+  </div>
+
+  <div class="card form-card">
+    <h2>Στείλτε μας μήνυμα</h2>
+    <p class="muted">Απαντάμε συνήθως μέσα σε λίγες ώρες.</p>
+    <% if (sent) { %><div class="alert alert-success">Ευχαριστούμε! Το μήνυμά σας στάλθηκε.</div><% } %>
+    <form method="post" action="/contact" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf() %>">
+      <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="field"><span>Ονοματεπώνυμο *</span><input name="name" required maxlength="120" autocomplete="name"></label>
+      <div class="range">
+        <label class="field"><span>Τηλέφωνο</span><input name="phone" type="tel" maxlength="40" autocomplete="tel"></label>
+        <label class="field"><span>Email</span><input name="email" type="email" maxlength="200" autocomplete="email"></label>
+      </div>
+      <label class="field"><span>Μήνυμα *</span><textarea name="message" required rows="6" maxlength="4000"></textarea></label>
+      <button class="btn btn-brand btn-lg"><%- icon('mail') %> Αποστολή</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/footer.html') %>

@@ -1,0 +1,145 @@
+<%- include('partials/header.html') %>
+
+<section class="hero"<% if (site.cover) { %> style="--hero-img: url('/uploads/<%= site.cover %>')"<% } %>>
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="container hero-inner">
+    <div class="hero-copy reveal">
+      <span class="eyebrow"><%- icon('shield') %> <%= site.dealer_name %> · <%= site.city %></span>
+      <h1><%= site.hero_title %></h1>
+      <p><%= site.hero_subtitle %></p>
+      <div class="hero-cta">
+        <a class="btn btn-brand btn-lg" href="/cars"><%- icon('car') %> Δείτε όλα τα αυτοκίνητα (<%= totalActive %>)</a>
+        <% if (site.phone) { %><a class="btn btn-ghost btn-lg" href="tel:<%= fmt.tel(site.phone) %>"><%- icon('phone') %> <%= site.phone %></a><% } %>
+      </div>
+    </div>
+
+    <form class="quick-search reveal" method="get" action="/cars" data-quick-search>
+      <h2><%- icon('search') %> Γρήγορη αναζήτηση</h2>
+      <label class="field">
+        <span>Μάρκα</span>
+        <select name="make" data-make-select>
+          <option value="">Όλες οι μάρκες</option>
+          <% facets.makes.forEach(m => { %><option value="<%= m.v %>"><%= m.v %> (<%= m.n %>)</option><% }) %>
+        </select>
+      </label>
+      <label class="field">
+        <span>Μοντέλο</span>
+        <select name="model" data-model-select disabled><option value="">Όλα τα μοντέλα</option></select>
+      </label>
+      <div class="qs-row">
+        <label class="field">
+          <span>Τιμή έως</span>
+          <select name="price_max">
+            <option value="">Οποιαδήποτε</option>
+            <% [5000, 10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000].forEach(p => { %><option value="<%= p %>"><%= fmt.price(p) %></option><% }) %>
+          </select>
+        </label>
+        <label class="field">
+          <span>Από έτος</span>
+          <select name="year_min">
+            <option value="">Οποιοδήποτε</option>
+            <% for (let y = year; y >= 2005; y--) { %><option><%= y %></option><% } %>
+          </select>
+        </label>
+      </div>
+      <button class="btn btn-brand btn-block btn-lg" type="submit"><%- icon('search') %> Αναζήτηση</button>
+    </form>
+  </div>
+</section>
+
+<section class="trust-strip">
+  <div class="container trust-grid">
+    <div class="trust-item"><strong data-count="<%= totalActive %>"><%= totalActive %></strong><span>Αυτοκίνητα διαθέσιμα</span></div>
+    <div class="trust-item"><strong><%= site.years_experience %>+</strong><span>Χρόνια εμπειρίας</span></div>
+    <div class="trust-item"><strong><%= site.warranty_months %></strong><span>Μήνες εγγύηση</span></div>
+    <div class="trust-item"><strong><%= Math.max(Number(site.happy_customers) || 0, soldCount) %>+</strong><span>Ικανοποιημένοι πελάτες</span></div>
+  </div>
+</section>
+
+<% if (bodyTypes.length) { %>
+<section class="container section">
+  <div class="section-head">
+    <h2 class="section-title">Αναζήτηση ανά τύπο</h2>
+  </div>
+  <div class="type-chips">
+    <% bodyTypes.forEach(b => { %>
+      <a class="type-chip" href="/cars?body_type=<%= encodeURIComponent(b.v) %>"><%- icon('car') %><span><%= b.v %></span><small><%= b.n %></small></a>
+    <% }) %>
+  </div>
+</section>
+<% } %>
+
+<% if (featured.length) { %>
+<section class="container section">
+  <div class="section-head">
+    <div>
+      <span class="kicker">Επιλογές μας</span>
+      <h2 class="section-title">Προτεινόμενα αυτοκίνητα</h2>
+    </div>
+    <a class="link-arrow" href="/cars">Όλα τα αυτοκίνητα <%- icon('arrow') %></a>
+  </div>
+  <div class="car-grid">
+    <% featured.forEach(car => { %><%- include('partials/car-card.html', { car }) %><% }) %>
+  </div>
+</section>
+<% } %>
+
+<% if (latest.length) { %>
+<section class="container section">
+  <div class="section-head">
+    <div>
+      <span class="kicker">Μόλις ήρθαν</span>
+      <h2 class="section-title">Νέες αφίξεις</h2>
+    </div>
+    <a class="link-arrow" href="/cars">Δείτε περισσότερα <%- icon('arrow') %></a>
+  </div>
+  <div class="car-grid">
+    <% latest.forEach(car => { %><%- include('partials/car-card.html', { car }) %><% }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="section why">
+  <div class="container">
+    <div class="section-head center">
+      <div>
+        <span class="kicker">Γιατί <%= site.dealer_name %></span>
+        <h2 class="section-title">Αγοράστε με σιγουριά</h2>
+      </div>
+    </div>
+    <div class="why-grid">
+      <div class="why-card reveal"><span class="why-ic"><%- icon('shield') %></span><h3>Εγγύηση <%= site.warranty_months %> μηνών</h3><p>Κάθε αυτοκίνητο συνοδεύεται από γραπτή εγγύηση για τα κύρια μηχανικά μέρη.</p></div>
+      <div class="why-card reveal"><span class="why-ic"><%- icon('wrench') %></span><h3>Πλήρης τεχνικός έλεγχος</h3><p>Έλεγχος σε πάνω από 100 σημεία και πιστοποιημένα χιλιόμετρα πριν την πώληση.</p></div>
+      <div class="why-card reveal"><span class="why-ic"><%- icon('wallet') %></span><h3>Χρηματοδότηση</h3><p>Άτοκες δόσεις με πιστωτική κάρτα ή δάνειο με γρήγορη έγκριση.</p></div>
+      <div class="why-card reveal"><span class="why-ic"><%- icon('swap') %></span><h3>Ανταλλαγή</h3><p>Φέρτε το αυτοκίνητό σας και πάρτε δίκαιη εκτίμηση για ανταλλαγή.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="container section">
+  <div class="cta-banner reveal">
+    <div>
+      <h2>Θέλετε να πουλήσετε το αυτοκίνητό σας;</h2>
+      <p>Στείλτε μας τα στοιχεία του και θα σας κάνουμε δωρεάν εκτίμηση μέσα σε 24 ώρες.</p>
+    </div>
+    <a class="btn btn-light btn-lg" href="/sell"><%- icon('tag') %> Ζητήστε εκτίμηση</a>
+  </div>
+</section>
+
+<section class="container section visit">
+  <div class="visit-card">
+    <div>
+      <span class="kicker">Επισκεφθείτε μας</span>
+      <h2 class="section-title"><%= site.address %><%= site.city ? `, ${site.city}` : '' %></h2>
+      <p class="pre muted"><%= site.hours %></p>
+      <div class="hero-cta">
+        <a class="btn btn-brand" href="/contact"><%- icon('pin') %> Οδηγίες & επικοινωνία</a>
+        <% if (site.phone) { %><a class="btn btn-light" href="tel:<%= fmt.tel(site.phone) %>"><%- icon('phone') %> <%= site.phone %></a><% } %>
+      </div>
+    </div>
+    <% const mapQ = site.map_embed_query || `${site.address} ${site.city}`; %>
+    <iframe class="map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Χάρτης" src="https://maps.google.com/maps?q=<%= encodeURIComponent(mapQ) %>&output=embed"></iframe>
+  </div>
+</section>
+
+<%- include('partials/footer.html') %>

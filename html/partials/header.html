@@ -1,0 +1,35 @@
+<%- include('head.html') %>
+<body>
+<a class="skip" href="#main">Μετάβαση στο περιεχόμενο</a>
+<header class="topbar" data-topbar>
+  <div class="container topbar-inner">
+    <a class="brand" href="/" aria-label="<%= site.dealer_name %> – Αρχική">
+      <img class="brand-icon" src="<%= site.logoUrl %>" alt="">
+      <img class="brand-wordmark" src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>">
+    </a>
+    <nav class="mainnav" id="mainnav" aria-label="Κύριο μενού">
+      <% const nav = [['/cars', 'Αυτοκίνητα'], ['/sell', 'Πώληση αυτοκινήτου'], ...(site.finance_enabled === '1' ? [['/finance', 'Χρηματοδότηση']] : []), ['/about', 'Η εταιρεία'], ['/contact', 'Επικοινωνία']]; %>
+      <% nav.forEach(([href, label]) => { %>
+        <a href="<%= href %>" class="<%= path === href ? 'active' : '' %>"><%= label %></a>
+      <% }) %>
+      <% if (user) { %><a href="/admin" class="nav-admin"><%- icon('dashboard') %> Admin</a><% } %>
+    </nav>
+    <div class="topbar-actions">
+      <a class="icon-btn fav-link" href="/favorites" aria-label="Αγαπημένα" title="Αγαπημένα">
+        <%- icon('heart') %><span class="fav-count" data-fav-count hidden>0</span>
+      </a>
+      <% if (site.phone) { %>
+        <a class="btn btn-brand btn-call" href="tel:<%= fmt.tel(site.phone) %>"><%- icon('phone') %><span><%= site.phone %></span></a>
+      <% } %>
+      <button class="icon-btn menu-toggle" type="button" aria-label="Μενού" aria-controls="mainnav" aria-expanded="false" data-menu-toggle>
+        <%- icon('menu', 'ic-open') %><%- icon('x', 'ic-close') %>
+      </button>
+    </div>
+  </div>
+</header>
+<main id="main">
+<% if (flashes.length) { %>
+  <div class="container flashes">
+    <% flashes.forEach(f => { %><div class="alert alert-<%= f.type %>"><%= f.message %></div><% }) %>
+  </div>
+<% } %>

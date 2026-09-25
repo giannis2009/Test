@@ -1,0 +1,21 @@
+<%- include('partials/header.html') %>
+
+<section class="page-hero">
+  <div class="container">
+    <nav class="crumbs" aria-label="Διαδρομή"><a href="/">Αρχική</a><span>/</span><span>Αγαπημένα</span></nav>
+    <h1>Αγαπημένα</h1>
+    <p>Τα αυτοκίνητα που αποθηκεύσατε πατώντας την καρδιά. Φυλάσσονται σε αυτή τη συσκευή.</p>
+  </div>
+</section>
+
+<section class="container section">
+  <div class="car-grid" data-favorites-list></div>
+  <div class="empty card" data-favorites-empty hidden>
+    <span class="empty-ic"><%- icon('heart') %></span>
+    <h3>Δεν έχετε αποθηκεύσει αυτοκίνητα ακόμα</h3>
+    <p class="muted">Πατήστε την καρδιά σε όποιο αυτοκίνητο σας αρέσει για να το βρίσκετε εύκολα εδώ.</p>
+    <a class="btn btn-brand" href="/cars"><%- icon('car') %> Δείτε τα αυτοκίνητα</a>
+  </div>
+</section>
+
+<%- include('partials/footer.html') %>

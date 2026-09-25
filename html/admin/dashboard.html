@@ -1,0 +1,63 @@
+<%- include('_header.html') %>
+<div class="admin-head">
+  <div>
+    <h1>Γεια σας, <%= user.username %></h1>
+    <p class="muted">Μια γρήγορη ματιά στην επιχείρησή σας.</p>
+  </div>
+  <a class="btn btn-brand" href="/admin/cars/new"><%- icon('plus') %> Νέα αγγελία</a>
+</div>
+
+<div class="stat-grid">
+  <a class="stat" href="/admin/cars?status=active"><span class="stat-ic ic-blue"><%- icon('car') %></span><div><span>Ενεργές αγγελίες</span><strong><%= stats.active %></strong></div></a>
+  <a class="stat" href="/admin/cars?status=reserved"><span class="stat-ic ic-amber"><%- icon('clock') %></span><div><span>Κρατημένα</span><strong><%= stats.reserved %></strong></div></a>
+  <a class="stat" href="/admin/cars?status=sold"><span class="stat-ic ic-green"><%- icon('check') %></span><div><span>Πωλήθηκαν</span><strong><%= stats.sold %></strong></div></a>
+  <a class="stat" href="/admin/inquiries"><span class="stat-ic ic-violet"><%- icon('message') %></span><div><span>Νέα μηνύματα</span><strong><%= unreadCount %></strong></div></a>
+  <div class="stat"><span class="stat-ic ic-slate"><%- icon('eye') %></span><div><span>Συνολικές προβολές</span><strong><%= fmt.num(stats.views) %></strong></div></div>
+  <div class="stat"><span class="stat-ic ic-blue"><%- icon('wallet') %></span><div><span>Αξία αποθέματος</span><strong><%= fmt.price(stats.stockValue) %></strong></div></div>
+  <a class="stat" href="/admin/cars?status=draft"><span class="stat-ic ic-slate"><%- icon('edit') %></span><div><span>Πρόχειρα</span><strong><%= stats.draft %></strong></div></a>
+  <a class="stat" href="/admin/backups"><span class="stat-ic ic-green"><%- icon('save') %></span><div><span>Τελευταίο αντίγραφο</span><strong class="stat-sm"><%= lastBackup ? lastBackup.date : 'Κανένα' %></strong></div></a>
+</div>
+
+<% if (noPhotos.length) { %>
+  <div class="alert alert-warning"><strong><%= noPhotos.length %> ενεργές αγγελίες δεν έχουν φωτογραφίες:</strong>
+    <% noPhotos.forEach((c, i) => { %><a href="/admin/cars/<%= c.id %>/edit"><%= carTitle(c) %></a><%= i < noPhotos.length - 1 ? ', ' : '' %><% }) %>
+  </div>
+<% } %>
+
+<div class="admin-cols">
+  <section class="card">
+    <div class="card-head"><h2>Τελευταία μηνύματα</h2><a href="/admin/inquiries" class="link-arrow small">Όλα <%- icon('arrow') %></a></div>
+    <% if (!latestInquiries.length) { %><p class="muted">Δεν υπάρχουν μηνύματα ακόμα.</p><% } %>
+    <ul class="list">
+      <% latestInquiries.forEach(q => { %>
+        <li class="<%= q.is_read ? '' : 'unread' %>">
+          <span class="avatar sm"><%= q.name.charAt(0).toUpperCase() %></span>
+          <div class="list-body">
+            <div><strong><%= q.name %></strong> <span class="type-tag type-<%= q.type %>"><%= C.INQUIRY_TYPES[q.type] || q.type %></span></div>
+            <div class="muted small ellipsis"><%= q.make ? `${q.make} ${q.model} · ` : '' %><%= q.message %></div>
+          </div>
+          <span class="muted small nowrap"><%= fmt.date(q.created_at) %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Δημοφιλέστερες αγγελίες</h2><a href="/admin/cars" class="link-arrow small">Όλες <%- icon('arrow') %></a></div>
+    <% if (!topViewed.length) { %><p class="muted">Δεν υπάρχουν αγγελίες ακόμα. <a href="/admin/cars/new">Προσθέστε την πρώτη!</a></p><% } %>
+    <ul class="list">
+      <% const maxViews = Math.max(1, ...topViewed.map(c => c.views)); %>
+      <% topViewed.forEach(c => { %>
+        <li>
+          <img class="thumb sm" src="<%= c.cover ? `/uploads/${c.cover}` : '/images/no-photo.svg' %>" alt="">
+          <div class="list-body">
+            <a href="/admin/cars/<%= c.id %>/edit"><strong><%= carTitle(c) %></strong></a>
+            <div class="bar"><span style="width: <%= Math.round(c.views / maxViews * 100) %>%"></span></div>
+          </div>
+          <span class="small nowrap"><%- icon('eye') %> <%= c.views %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+<%- include('_footer.html') %>

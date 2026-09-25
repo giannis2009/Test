@@ -1,0 +1,19 @@
+<%- include('../partials/head.html') %>
+<body class="login-body">
+  <div class="login-wrap">
+    <form method="post" action="/admin/login" class="login-card stack">
+      <div class="login-logo"><img src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>"></div>
+      <div>
+        <h1>Καλώς ήρθατε</h1>
+        <p class="muted">Συνδεθείτε για να διαχειριστείτε τις αγγελίες σας.</p>
+      </div>
+      <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+      <input type="hidden" name="_csrf" value="<%= csrf() %>">
+      <label class="field"><span>Όνομα χρήστη</span><div class="input-icon"><%- icon('user') %><input name="username" required autocomplete="username" autofocus></div></label>
+      <label class="field"><span>Κωδικός</span><div class="input-icon"><%- icon('key') %><input name="password" type="password" required autocomplete="current-password"></div></label>
+      <button class="btn btn-brand btn-block btn-lg">Σύνδεση</button>
+      <a href="/" class="small muted back-link"><%- icon('back') %> Πίσω στο site</a>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<%- include('partials/header.html') %>
+
+<section class="page-hero">
+  <div class="container">
+    <nav class="crumbs" aria-label="Διαδρομή"><a href="/">Αρχική</a><span>/</span><span>Πούλησε το αυτοκίνητό σου</span></nav>
+    <h1>Πούλησε το αυτοκίνητό σου</h1>
+    <p>Δωρεάν εκτίμηση, άμεση πληρωμή και εμείς αναλαμβάνουμε όλη τη γραφειοκρατία.</p>
+  </div>
+</section>
+
+<section class="container section sell-page">
+  <div>
+    <ol class="steps">
+      <li><span>1</span><div><h3>Συμπληρώστε τη φόρμα</h3><p>Βασικά στοιχεία του αυτοκινήτου σας, σε 2 λεπτά.</p></div></li>
+      <li><span>2</span><div><h3>Λάβετε εκτίμηση</h3><p>Σας καλούμε με μια πρώτη προσφορά μέσα σε 24 ώρες.</p></div></li>
+      <li><span>3</span><div><h3>Αυτοψία & πληρωμή</h3><p>Ελέγχουμε το αυτοκίνητο και πληρώνεστε άμεσα.</p></div></li>
+    </ol>
+    <div class="card note-card">
+      <h3><%- icon('swap') %> Ανταλλαγή</h3>
+      <p class="muted">Θέλετε να αλλάξετε αυτοκίνητο; Η αξία του δικού σας αφαιρείται από την τιμή του νέου.</p>
+    </div>
+  </div>
+
+  <div class="card form-card">
+    <h2>Στοιχεία αυτοκινήτου</h2>
+    <% if (sent) { %><div class="alert alert-success">Ευχαριστούμε! Λάβαμε το αίτημά σας και θα σας καλέσουμε σύντομα με την εκτίμησή μας.</div><% } %>
+    <form method="post" action="/sell" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf() %>">
+      <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <div class="range">
+        <label class="field"><span>Μάρκα *</span><input name="d_make" required list="makes" maxlength="60"></label>
+        <label class="field"><span>Μοντέλο *</span><input name="d_model" required maxlength="60"></label>
+      </div>
+      <datalist id="makes"><% C.MAKES.forEach(m => { %><option value="<%= m %>"><% }) %></datalist>
+      <div class="range">
+        <label class="field"><span>Έτος</span><select name="d_year"><option value=""></option><% for (let y = year; y >= 1990; y--) { %><option><%= y %></option><% } %></select></label>
+        <label class="field"><span>Χιλιόμετρα</span><input name="d_km" type="number" min="0" inputmode="numeric"></label>
+      </div>
+      <div class="range">
+        <label class="field"><span>Καύσιμο</span><select name="d_fuel"><option value=""></option><% C.FUELS.forEach(f => { %><option><%= f %></option><% }) %></select></label>
+        <label class="field"><span>Ζητούμενη τιμή (€)</span><input name="d_price" type="number" min="0" inputmode="numeric"></label>
+      </div>
+      <label class="check"><input type="checkbox" name="d_trade" value="Ναι"> Ενδιαφέρομαι για ανταλλαγή</label>
+      <h3 class="form-sub">Τα στοιχεία σας</h3>
+      <label class="field"><span>Ονοματεπώνυμο *</span><input name="name" required maxlength="120" autocomplete="name"></label>
+      <div class="range">
+        <label class="field"><span>Τηλέφωνο *</span><input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
+        <label class="field"><span>Email</span><input name="email" type="email" maxlength="200" autocomplete="email"></label>
+      </div>
+      <label class="field"><span>Σχόλια (κατάσταση, service, ζημιές…)</span><textarea name="message" rows="4" maxlength="4000"></textarea></label>
+      <button class="btn btn-brand btn-lg"><%- icon('tag') %> Ζητήστε δωρεάν εκτίμηση</button>
+    </form>
+  </div>
+</section>
+
+<%- include('partials/footer.html') %>

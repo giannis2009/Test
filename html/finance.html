@@ -1,0 +1,61 @@
+<%- include('partials/header.html') %>
+
+<section class="page-hero">
+  <div class="container">
+    <nav class="crumbs" aria-label="Διαδρομή"><a href="/">Αρχική</a><span>/</span><span>Χρηματοδότηση</span></nav>
+    <h1>Χρηματοδότηση</h1>
+    <p>Αποκτήστε το αυτοκίνητο που θέλετε με δόσεις που σας ταιριάζουν.</p>
+  </div>
+</section>
+
+<section class="container section sell-page">
+  <div>
+    <div class="card finance-calc" data-finance data-price="<%= car && car.price ? car.price : 20000 %>" data-rate="<%= site.finance_rate %>">
+      <h2><%- icon('wallet') %> Υπολογιστής δόσεων</h2>
+      <label class="field"><span>Τιμή αυτοκινήτου (€)</span><input type="number" min="1000" step="500" value="<%= car && car.price ? car.price : 20000 %>" data-price-input inputmode="numeric"></label>
+      <div class="finance-grid">
+        <label class="field"><span>Προκαταβολή: <strong data-down-label></strong></span>
+          <input type="range" min="0" max="<%= Math.round((car && car.price ? car.price : 20000) * 0.7) %>" step="500" value="<%= Math.round((car && car.price ? car.price : 20000) * 0.3 / 500) * 500 %>" data-down>
+        </label>
+        <label class="field"><span>Διάρκεια</span>
+          <select data-months><% [12, 24, 36, 48, 60, 72, 84].forEach(m => { %><option value="<%= m %>" <%= m === 60 ? 'selected' : '' %>><%= m %> μήνες</option><% }) %></select>
+        </label>
+      </div>
+      <div class="finance-result">
+        <div><span>Μηνιαία δόση από</span><strong data-monthly>—</strong></div>
+        <div><span>Ποσό χρηματοδότησης</span><strong data-financed>—</strong></div>
+      </div>
+      <p class="muted small">Ενδεικτικός υπολογισμός με επιτόκιο <%= site.finance_rate %>%. Η τελική δόση εξαρτάται από την έγκριση του πιστωτικού φορέα.</p>
+    </div>
+    <ul class="check-list">
+      <li><%- icon('check') %> Γρήγορη έγκριση, συνήθως την ίδια μέρα</li>
+      <li><%- icon('check') %> Από 12 έως 84 δόσεις</li>
+      <li><%- icon('check') %> Δυνατότητα χωρίς προκαταβολή</li>
+      <li><%- icon('check') %> Άτοκες δόσεις με πιστωτική κάρτα</li>
+    </ul>
+  </div>
+
+  <div class="card form-card">
+    <h2>Αίτηση χρηματοδότησης</h2>
+    <% if (car) { %><p class="muted">Για το: <a href="<%= carUrl(car) %>"><strong><%= carTitle(car) %></strong></a> · <%= fmt.price(car.price) %></p><% } %>
+    <% if (sent) { %><div class="alert alert-success">Ευχαριστούμε! Λάβαμε την αίτησή σας και θα επικοινωνήσουμε σύντομα.</div><% } %>
+    <form method="post" action="/finance" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrf() %>">
+      <input type="hidden" name="car_id" value="<%= car ? car.id : '' %>">
+      <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="field"><span>Ονοματεπώνυμο *</span><input name="name" required maxlength="120" autocomplete="name"></label>
+      <div class="range">
+        <label class="field"><span>Τηλέφωνο *</span><input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
+        <label class="field"><span>Email</span><input name="email" type="email" maxlength="200" autocomplete="email"></label>
+      </div>
+      <div class="range">
+        <label class="field"><span>Επιθυμητή προκαταβολή (€)</span><input name="d_down" type="number" min="0" inputmode="numeric"></label>
+        <label class="field"><span>Διάρκεια</span><select name="d_months"><option value=""></option><% [12, 24, 36, 48, 60, 72, 84].forEach(m => { %><option value="<%= m %>"><%= m %> μήνες</option><% }) %></select></label>
+      </div>
+      <label class="field"><span>Σχόλια</span><textarea name="message" rows="4" maxlength="4000"></textarea></label>
+      <button class="btn btn-brand btn-lg"><%- icon('wallet') %> Υποβολή αίτησης</button>
+    </form>
+  </div>
+</section>
+
+<%- include('partials/footer.html') %>

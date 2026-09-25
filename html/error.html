@@ -1,0 +1,13 @@
+<%- include('partials/header.html') %>
+<section class="container section">
+  <div class="empty card error-card">
+    <span class="empty-ic"><%- icon('car') %></span>
+    <h1><%= title %></h1>
+    <p class="muted"><%= message %></p>
+    <div class="hero-cta center">
+      <a class="btn btn-brand" href="/cars"><%- icon('car') %> Δείτε τα αυτοκίνητα</a>
+      <a class="btn btn-light" href="/"><%- icon('back') %> Αρχική</a>
+    </div>
+  </div>
+</section>
+<%- include('partials/footer.html') %>

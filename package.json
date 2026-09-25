@@ -1,0 +1,22 @@
+{
+  "name": "car-dealer-site",
+  "version": "1.0.0",
+  "description": "Ιστοσελίδα εμπόρου αυτοκινήτων (τύπου car.gr) με Admin Panel",
+  "main": "server/server.js",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --no-warnings server/server.js",
+    "dev": "node --no-warnings --watch server/server.js",
+    "seed": "node --no-warnings server/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "multer": "^2.0.1"
+  }
+}

@@ -1,0 +1,49 @@
+<%- include('_header.html') %>
+<div class="admin-head">
+  <div>
+    <h1>Αποθήκευση αλλαγών</h1>
+    <p class="muted">Αντίγραφα ασφαλείας όλων των αγγελιών, μηνυμάτων και ρυθμίσεων. Φυλάσσονται στον φάκελο <code>save-changes/backups</code>.</p>
+  </div>
+  <form method="post" action="/admin/backups">
+    <input type="hidden" name="_csrf" value="<%= csrf() %>">
+    <button class="btn btn-brand btn-lg"><%- icon('save') %> Αποθήκευση τώρα</button>
+  </form>
+</div>
+
+<div class="info-grid">
+  <div class="card info-box"><span class="stat-ic ic-green"><%- icon('shield') %></span><div><strong>Αυτόματα κάθε μέρα</strong><p class="muted small">Δημιουργείται αυτόματα ένα αντίγραφο την ημέρα και κρατιούνται τα τελευταία 30.</p></div></div>
+  <div class="card info-box"><span class="stat-ic ic-blue"><%- icon('camera') %></span><div><strong>Οι φωτογραφίες προστατεύονται</strong><p class="muted small">Οι φωτογραφίες που διαγράφετε κρατιούνται για 120 ημέρες, ώστε να επανέρχονται με την επαναφορά.</p></div></div>
+  <div class="card info-box"><span class="stat-ic ic-amber"><%- icon('restore') %></span><div><strong>Ασφαλής επαναφορά</strong><p class="muted small">Πριν από κάθε επαναφορά αποθηκεύεται αυτόματα η τρέχουσα κατάσταση.</p></div></div>
+</div>
+
+<% if (!backups.length) { %>
+  <div class="card empty"><span class="empty-ic"><%- icon('save') %></span><h3>Δεν υπάρχουν αντίγραφα ακόμα</h3><p class="muted">Πατήστε «Αποθήκευση τώρα» για να δημιουργήσετε το πρώτο.</p></div>
+<% } else { %>
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th>Ημερομηνία</th><th>Τύπος</th><th>Μέγεθος</th><th></th></tr></thead>
+  <tbody>
+  <% backups.forEach(b => { %>
+    <tr>
+      <td data-label="Ημερομηνία"><strong><%= b.date %></strong><div class="muted small"><%= b.name %></div></td>
+      <td data-label="Τύπος"><span class="type-tag type-<%= b.type %>"><%= b.typeLabel %></span></td>
+      <td data-label="Μέγεθος"><%= fmt.bytes(b.size) %></td>
+      <td class="actions-cell"><div class="row-actions">
+        <a class="btn btn-light btn-sm" href="/admin/backups/<%= b.name %>/download"><%- icon('download') %> Λήψη</a>
+        <form method="post" action="/admin/backups/<%= b.name %>/restore" data-confirm="Επαναφορά στο αντίγραφο της <%= b.date %>; Όλες οι αγγελίες, τα μηνύματα και οι ρυθμίσεις θα γυρίσουν σε εκείνη την ημερομηνία. Η τρέχουσα κατάσταση θα αποθηκευτεί πρώτα.">
+          <input type="hidden" name="_csrf" value="<%= csrf() %>">
+          <button class="btn btn-light btn-sm"><%- icon('restore') %> Επαναφορά</button>
+        </form>
+        <form method="post" action="/admin/backups/<%= b.name %>/delete" data-confirm="Διαγραφή του αντιγράφου της <%= b.date %>;">
+          <input type="hidden" name="_csrf" value="<%= csrf() %>">
+          <button class="icon-btn danger" title="Διαγραφή"><%- icon('trash') %></button>
+        </form>
+        </div>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+</div>
+<% } %>
+<%- include('_footer.html') %>
