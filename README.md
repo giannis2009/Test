@@ -1,6 +1,6 @@
-# AppleFX — Apple-style motion για Premiere Pro
+# AppleFX — Apple-grade motion για After Effects και Premiere Pro
 
-Panel (CEP extension) για **Adobe Premiere Pro 2021+** (Windows & macOS) που φέρνει καθαρό, “Apple / Keynote” motion με ένα κλικ:
+Panel (CEP extension) για **Adobe After Effects 2021+** και **Adobe Premiere Pro 2021+** (Windows & macOS). Το ίδιο panel ανοίγει και στα δύο προγράμματα και καταλαβαίνει μόνο του σε ποιο τρέχει. Φέρνει καθαρό, “Apple / Keynote” motion με ένα κλικ:
 **65 presets** σε 6 κατηγορίες, live preview και ρυθμίσεις για κάθε preset.
 
 Το panel έχει: εικονίδια κατηγοριών πάνω, λίστα presets αριστερά (με αστεράκι για αγαπημένα), graph καμπύλης με handles που σέρνεις (ή sliders Bounces/Settle για springs), κουμπί Apply κάτω, status bar και light/dark mode.
@@ -16,16 +16,32 @@ Panel (CEP extension) για **Adobe Premiere Pro 2021+** (Windows & macOS) πο
 
 ## Εγκατάσταση
 
-1. Κλείσε το Premiere Pro.
+1. Κλείσε το After Effects και το Premiere Pro.
 2. **Windows:** διπλό κλικ στο `install/install_windows.bat`
    **macOS:** στο Terminal: `bash install/install_mac.sh`
-3. Άνοιξε το Premiere Pro → **Window → Extensions → AppleFX**.
+3. Άνοιξε το After Effects ή το Premiere Pro → **Window → Extensions → AppleFX**.
 
 Το installer ενεργοποιεί το `PlayerDebugMode` (απαιτείται για extensions που δεν είναι υπογεγραμμένα ως `.zxp`) και αντιγράφει τον φάκελο `AppleFX/` στο:
 - Windows: `%APPDATA%\Adobe\CEP\extensions\AppleFX`
 - macOS: `~/Library/Application Support/Adobe/CEP/extensions/AppleFX`
 
-## Χρήση
+## After Effects
+
+- **Easing:** επίλεξε keyframes στο timeline (ή μια ιδιότητα με keyframes) και πάτα Apply.
+  - Καμπύλες bezier (Apple Standard, Emphasized, Decelerated…) γίνονται **πραγματικό keyframe ease**, που φαίνεται στο Graph Editor.
+  - Springs, Snap, Anticipate και Bouncy μπαίνουν ως **expression** στην ιδιότητα, γιατί χρειάζονται overshoot.
+  - Αν δεν έχεις επιλέξει ιδιότητα, εφαρμόζεται στις ιδιότητες του Transform που έχουν keyframes στα επιλεγμένα layers.
+- **Text / Transitions / Glass / Styles / Loops:** επίλεξε layers και πάτα Apply. Χρησιμοποιούνται:
+  - το Transform του layer,
+  - πραγματικό motion blur (layer + comp),
+  - το Gaussian Blur, το Brightness & Contrast και το Drop Shadow,
+  - mask με όνομα "AppleFX Crop" για τα wipes. Στα text layers ακολουθεί τα όρια του κειμένου.
+- **Transitions:** τα επιλεγμένα layers ταξινομούνται κατά in-point και κάθε ένα "παραδίδει" στο επόμενο.
+- **Glass:** εφάρμοσέ το σε adjustment layer ή σε αντίγραφο του footage από πάνω.
+- Κάθε Apply είναι **ένα Undo** (Ctrl/Cmd+Z). Το κουμπί με τον κάδο καθαρίζει τα keyframes του Transform και τα AppleFX expressions.
+
+## Premiere Pro
+
 
 1. Επίλεξε ένα ή περισσότερα clips στο timeline.
 2. Διάλεξε κατηγορία και preset: το preview δείχνει ακριβώς τι θα εφαρμοστεί.
@@ -60,9 +76,10 @@ AppleFX/                 το extension (αυτός ο φάκελος εγκαθ
   js/main.js             UI λογική
   jsx/host.jsx           ExtendScript: γράφει keyframes/effects στο Premiere
 install/                 installers Windows / macOS
-tests/                   unit tests (node --test)
+tests/                   tests (node --test), με προσομοίωση του scripting API
+                         του After Effects και του Premiere (tests/sim/)
 ```
 
-Development: άνοιξε το `AppleFX/index.html` σε browser για να δεις το panel σε “Preview mode” (το Apply προσομοιώνεται). Με ανοιχτό το Premiere, το debugging γίνεται στο `http://localhost:8098`. Tests: `npm test`.
+Development: άνοιξε το `AppleFX/index.html` σε browser για να δεις το panel σε “Preview mode” (το Apply προσομοιώνεται). Για After Effects mode στον browser: `index.html?host=ae`. Debugging: Premiere στο `http://localhost:8098`, After Effects στο `http://localhost:8099`. Tests: `npm test`.
 
 Για διανομή ως `.zxp` χρειάζεται υπογραφή με το `ZXPSignCmd` της Adobe.

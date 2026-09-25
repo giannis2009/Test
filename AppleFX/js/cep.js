@@ -9,6 +9,13 @@
   var cep = root.__adobe_cep__;
   var inHost = !!(cep && cep.evalScript);
 
+  // 'AEFT' (After Effects), 'PPRO' (Premiere Pro). Outside the apps: mock, ?host=ae mocks After Effects.
+  var appName = 'PPRO';
+  if (inHost) {
+    try { appName = JSON.parse(cep.getHostEnvironment()).appName || 'PPRO'; } catch (e) {}
+  } else if (root.location && /[?&]host=ae\b/i.test(root.location.search)) appName = 'AEFT';
+  var isAE = appName === 'AEFT';
+
   function rawEval(script) {
     return new Promise(function (resolve) {
       if (!inHost) return resolve(Mock.eval(script));
@@ -35,7 +42,7 @@
       if (t === 'object') { loaded = true; return; }
       var p = extensionPath().replace(/^file:\/\//, '').replace(/\\/g, '/');
       p = decodeURIComponent(p);
-      return rawEval('$.evalFile("' + p + '/jsx/host.jsx")').then(function () { loaded = true; });
+      return rawEval('$.evalFile("' + p + '/jsx/' + (isAE ? 'host_ae.jsx' : 'host.jsx') + '")').then(function () { loaded = true; });
     });
   }
 
@@ -59,7 +66,15 @@
       if (!m) return 'object';
       var fn = m[1], arg = m[2] ? JSON.parse(m[2]) : null;
       if (fn === 'ping') return JSON.stringify({ ok: true, version: 'mock' });
-      if (fn === 'getContext') return JSON.stringify(Mock.ctx);
+      if (fn === 'getContext') {
+        if (!isAE) return JSON.stringify(Mock.ctx);
+        return JSON.stringify({ ok: true, sequence: 'Main Comp', fps: 30, width: 1920, height: 1080, host: 'AEFT',
+          clips: Mock.ctx.clips.map(function (c, i) { return { track: 0, index: i, layer: i + 1, name: c.name, start: c.start, end: c.end, dur: c.dur }; }) });
+      }
+      if (fn === 'applyEase') {
+        root.__afxLastEase = arg;
+        return JSON.stringify({ ok: true, props: 2, segments: arg.native ? 2 : 0, mode: arg.native ? 'ease' : 'expression' });
+      }
       if (fn === 'getKeyframes') {
         return JSON.stringify({ ok: true, fps: 29.97, clips: Mock.ctx.clips.map(function (c) {
           return { track: c.track, index: c.index, name: c.name, params: [
@@ -81,5 +96,5 @@
   };
 
   root.AFX = root.AFX || {};
-  root.AFX.Host = { call: call, inHost: inHost, mock: Mock };
+  root.AFX.Host = { call: call, inHost: inHost, mock: Mock, app: appName, isAE: isAE };
 })(window);

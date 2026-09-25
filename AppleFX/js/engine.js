@@ -376,7 +376,22 @@
     });
   }
 
+  /*
+   * After Effects easing payload. Bezier curves that stay inside 0..1 become real
+   * keyframe ease; springs and overshooting curves are sent as a sampled table
+   * that host_ae.jsx turns into an expression.
+   */
+  function easePayload(curveId, edit, name) {
+    var def = Easing.byId[curveId] || Easing.byId['apple-default'];
+    var v = (edit && edit.length === def.v.length) ? edit : def.v;
+    var f = Easing.make(def.id, edit), table = [], i;
+    for (i = 0; i <= 200; i++) table.push(round(f(i / 200), 5));
+    var native = def.type === 'bezier' && v[1] >= 0 && v[1] <= 1 && v[3] >= 0 && v[3] <= 1;
+    return { name: name || def.name, native: native, bezier: def.type === 'bezier' ? v.slice() : null, table: table };
+  }
+
   var api = {
+    easePayload: easePayload,
     CHANNELS: CHANNELS, IDENT: IDENT,
     resolve: resolve, stateIn: stateIn, stateOut: stateOut, stateLoop: stateLoop,
     buildClip: buildClip, bakeExisting: bakeExisting, transitionRoles: transitionRoles,

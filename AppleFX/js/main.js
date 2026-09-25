@@ -36,6 +36,16 @@
     styles: 'One-click look for the selected clips.',
     loops: 'Bakes motion across each selected clip.'
   };
+  if (Host.isAE) {
+    HINTS.easing = 'Select keyframes, then Apply. Springs apply as an expression.';
+    HINTS.text = 'Applies to the selected layers. One undo step.';
+    HINTS.transitions = 'Select 2+ layers. Each hands off to the next by in-point.';
+    HINTS.glass = 'Apply to an adjustment layer or a copy above your footage.';
+    HINTS.styles = 'One-click look for the selected layers.';
+    HINTS.loops = 'Bakes motion across each selected layer.';
+  }
+  var UNIT = Host.isAE ? 'layer' : 'clip';
+  function units(n) { return n + ' ' + UNIT + (n === 1 ? '' : 's'); }
   var STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
 
   function presetsIn(cat) { return Presets.PRESETS.filter(function (p) { return p.cat === cat; }); }
@@ -392,9 +402,12 @@
         rangeCtl(g, 'Settle', r2(cur.s), 1, 40, 0.5, function (v) { return v.toFixed(1); }, function (v) { cur.s = v; upd(); });
         help(host, 'Bounces = how many times it overshoots. Settle = how fast it calms down. The graph updates live.');
       }
-      var og = group(host);
-      og.style.marginTop = '12px';
-      segCtl(og, p, s, { key: 'density', label: 'Keyframes', options: [['smart', 'Smart'], ['full', 'Every frame']] });
+      // After Effects uses real keyframe ease / expressions, so there is nothing to bake.
+      if (!Host.isAE) {
+        var og = group(host);
+        og.style.marginTop = '12px';
+        segCtl(og, p, s, { key: 'density', label: 'Keyframes', options: [['smart', 'Smart'], ['full', 'Every frame']] });
+      }
       return;
     }
 
@@ -484,7 +497,7 @@
       dot.className = Host.inHost ? 'dot' : 'dot mock';
       $('conn').textContent = Host.inHost ? 'Connected' : 'Preview mode';
     }
-    $('sel').textContent = n + ' clip' + (n === 1 ? '' : 's') + ' selected';
+    $('sel').textContent = units(n) + ' selected';
     $('apply').classList.toggle('ready', n > 0);
   }
   function refreshSelection() {
@@ -498,11 +511,11 @@
   function planFor(p, s, ctx) {
     if (p.kind === 'transition') {
       return Engine.transitionRoles(ctx.clips).map(function (x) {
-        return { track: x.clip.track, index: x.clip.index, ops: Engine.buildClip(p, s, x.clip, ctx.fps, x.role) };
+        return { track: x.clip.track, index: x.clip.index, layer: x.clip.layer, ops: Engine.buildClip(p, s, x.clip, ctx.fps, x.role) };
       });
     }
     return ctx.clips.map(function (c) {
-      return { track: c.track, index: c.index, ops: Engine.buildClip(p, s, c, ctx.fps) };
+      return { track: c.track, index: c.index, layer: c.layer, ops: Engine.buildClip(p, s, c, ctx.fps) };
     });
   }
 
@@ -517,7 +530,16 @@
     setBusy(true);
     Host.call('getContext').then(function (ctx) {
       if (!ctx.ok) throw new Error(ctx.error);
-      if (!ctx.clips.length) throw new Error('Select one or more clips in the timeline first.');
+      if (p.kind === 'ease' && Host.isAE) {
+        return Host.call('applyEase', Engine.easePayload(p.curve, s.edit, name)).then(function (res) {
+          if (res && res.ok) {
+            res.message = 'Applied ' + name + ' · ' + res.props + ' prop' + (res.props === 1 ? '' : 's') +
+              (res.mode === 'ease' ? ' · keyframe ease' : ' · expression');
+          }
+          return res;
+        });
+      }
+      if (!ctx.clips.length) throw new Error('Select one or more ' + UNIT + 's in the timeline first.');
       if (p.kind === 'ease') {
         return Host.call('getKeyframes').then(function (kf) {
           if (!kf.ok) throw new Error(kf.error);
@@ -531,7 +553,7 @@
       return Host.call('applyPlan', { clips: planFor(p, s, ctx) });
     }).then(function (res) {
       if (!res || !res.ok) throw new Error((res && res.error) || 'Something went wrong.');
-      var msg = 'Applied ' + name + ' · ' + res.clips + ' clip' + (res.clips === 1 ? '' : 's') + (res.keys ? ' · ' + res.keys + ' keyframes' : '');
+      var msg = res.message || ('Applied ' + name + ' · ' + units(res.clips) + (res.keys ? ' · ' + res.keys + ' keyframes' : ''));
       results[p.id] = msg;
       if (current().id === p.id) { $('result').textContent = msg; $('result').hidden = false; }
       if (res.warnings && res.warnings.length) {
@@ -550,12 +572,15 @@
     setBusy(true);
     Host.call('resetAnimation').then(function (res) {
       if (!res.ok) throw new Error(res.error);
-      toast(res.clips ? 'Cleared keyframes on ' + res.clips + ' clip' + (res.clips === 1 ? '' : 's') : 'Select clips to clear.');
+      toast(res.clips ? 'Cleared keyframes on ' + units(res.clips) : 'Select ' + UNIT + 's to clear.');
     }).catch(function (e) { toast(e.message || String(e), 'err'); })
       .then(function () { setBusy(false); });
   });
 
   // ------------------------------------------------------------ boot
+  $('appName').textContent = Host.isAE ? 'After Effects' : 'Premiere Pro';
+  $('clear').title = Host.isAE ? 'Clear Transform keyframes and AppleFX expressions on the selected layers'
+    : 'Clear Motion, Opacity and Transform keyframes on the selected clips';
   window.addEventListener('resize', function () { preview.fit(); });
   renderAll();
   refreshSelection();
