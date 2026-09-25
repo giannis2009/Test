@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <% const pageTitle = title ? `${title} | ${site.dealer_name}` : `${site.dealer_name} – ${site.tagline}`; %>
+  <title><%= pageTitle %></title>
+  <meta name="description" content="<%= typeof metaDescription !== 'undefined' ? metaDescription : `${site.dealer_name}: ${site.tagline}. ${site.address}, ${site.city}.` %>">
+  <meta property="og:title" content="<%= pageTitle %>">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="<%= site.dealer_name %>">
+  <meta property="og:image" content="<%= baseUrl %><%= typeof ogImage !== 'undefined' && ogImage ? ogImage : site.logoWideUrl %>">
+  <% if (typeof admin !== 'undefined') { %><meta name="robots" content="noindex"><% } %>
+  <link rel="icon" href="<%= site.logoUrl %>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/style.css">
+  <% if (typeof admin !== 'undefined') { %><link rel="stylesheet" href="/css/admin.css"><% } %>
+  <meta name="theme-color" content="#000000">
+  <style>:root { --brand: <%= site.primary_color || '#0c5ba6' %>; --accent: <%= site.secondary_color || '#e7e7e7' %>; }</style>
+</head>

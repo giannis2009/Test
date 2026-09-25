@@ -1,0 +1,91 @@
+<%- include('_header.html') %>
+<div class="admin-head">
+  <div>
+    <h1>Στοιχεία εμπόρου</h1>
+    <p class="muted">Ό,τι αλλάξετε εδώ εμφανίζεται αμέσως σε όλο το site.</p>
+  </div>
+</div>
+
+<form method="post" action="/admin/settings" enctype="multipart/form-data" class="car-form" data-car-form>
+  <input type="hidden" name="_csrf" value="<%= csrf() %>">
+  <div class="form-layout">
+    <div class="form-main">
+      <section class="card">
+        <h2><%- icon('building') %> Επωνυμία</h2>
+        <div class="form-grid cols-2">
+          <label class="field"><span>Όνομα εμπόρου</span><input name="dealer_name" required value="<%= site.dealer_name %>"></label>
+          <label class="field"><span>Σλόγκαν</span><input name="tagline" value="<%= site.tagline %>"></label>
+          <label class="field"><span>Τίτλος αρχικής σελίδας</span><input name="hero_title" value="<%= site.hero_title %>"></label>
+          <label class="field"><span>Υπότιτλος αρχικής σελίδας</span><input name="hero_subtitle" value="<%= site.hero_subtitle %>"></label>
+          <label class="field"><span>Χρόνια εμπειρίας</span><input name="years_experience" type="number" min="0" value="<%= site.years_experience %>"></label>
+          <label class="field"><span>Μήνες εγγύησης</span><input name="warranty_months" type="number" min="0" value="<%= site.warranty_months %>"></label>
+          <label class="field"><span>Ικανοποιημένοι πελάτες</span><input name="happy_customers" type="number" min="0" value="<%= site.happy_customers %>"></label>
+        </div>
+        <label class="field"><span>Σχετικά με εμάς (σελίδα «Η εταιρεία»)</span><textarea name="about" rows="5"><%= site.about %></textarea></label>
+      </section>
+
+      <section class="card">
+        <h2><%- icon('phone') %> Επικοινωνία</h2>
+        <div class="form-grid cols-2">
+          <label class="field"><span>Τηλέφωνο</span><input name="phone" value="<%= site.phone %>"></label>
+          <label class="field"><span>Κινητό</span><input name="mobile" value="<%= site.mobile %>"></label>
+          <label class="field"><span>WhatsApp (με κωδικό χώρας, π.χ. 30690…)</span><input name="whatsapp" value="<%= site.whatsapp %>"></label>
+          <label class="field"><span>Viber (π.χ. +30690…)</span><input name="viber" value="<%= site.viber %>"></label>
+          <label class="field"><span>Email</span><input name="email" type="email" value="<%= site.email %>"></label>
+          <label class="field"><span>Διεύθυνση</span><input name="address" value="<%= site.address %>"></label>
+          <label class="field"><span>Πόλη</span><input name="city" value="<%= site.city %>"></label>
+          <label class="field"><span>Χάρτης: αναζήτηση (προαιρετικό)</span><input name="map_embed_query" value="<%= site.map_embed_query %>" placeholder="Αλλιώς χρησιμοποιείται η διεύθυνση"></label>
+        </div>
+        <label class="field"><span>Ωράριο</span><textarea name="hours" rows="3"><%= site.hours %></textarea></label>
+      </section>
+
+      <section class="card">
+        <h2><%- icon('share') %> Social media</h2>
+        <div class="form-grid">
+          <label class="field"><span>Facebook</span><input name="facebook" value="<%= site.facebook %>" placeholder="https://facebook.com/…"></label>
+          <label class="field"><span>Instagram</span><input name="instagram" value="<%= site.instagram %>" placeholder="https://instagram.com/…"></label>
+          <label class="field"><span>TikTok</span><input name="tiktok" value="<%= site.tiktok %>" placeholder="https://tiktok.com/@…"></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><%- icon('wallet') %> Χρηματοδότηση</h2>
+        <label class="switch"><input type="checkbox" name="finance_enabled" value="1" <%= site.finance_enabled === '1' ? 'checked' : '' %>><span></span> Εμφάνιση σελίδας χρηματοδότησης και υπολογιστή δόσεων</label>
+        <label class="field narrow-field"><span>Ενδεικτικό επιτόκιο (%)</span><input name="finance_rate" inputmode="decimal" value="<%= site.finance_rate %>"></label>
+      </section>
+    </div>
+
+    <aside class="form-side">
+      <section class="card publish-card">
+        <h2><%- icon('palette') %> Εμφάνιση</h2>
+        <div class="range">
+          <label class="field"><span>Κύριο χρώμα</span><input name="primary_color" type="color" value="<%= site.primary_color %>"></label>
+          <label class="field"><span>Δευτερεύον</span><input name="secondary_color" type="color" value="<%= site.secondary_color %>"></label>
+        </div>
+        <div class="field">
+          <span>Λογότυπο (εικονίδιο)</span>
+          <div class="logo-preview light"><img src="<%= site.logoUrl %>" alt=""></div>
+          <input type="file" name="logo" accept="image/*">
+          <% if (site.logo) { %><label class="check small"><input type="checkbox" name="remove_logo" value="1"> Επαναφορά προεπιλογής</label><% } %>
+        </div>
+        <div class="field">
+          <span>Λογότυπο (οριζόντιο)</span>
+          <div class="logo-preview dark"><img src="<%= site.logoWideUrl %>" alt=""></div>
+          <input type="file" name="logo_wide" accept="image/*">
+          <% if (site.logo_wide) { %><label class="check small"><input type="checkbox" name="remove_logo_wide" value="1"> Επαναφορά προεπιλογής</label><% } %>
+        </div>
+        <div class="field">
+          <span>Φόντο αρχικής σελίδας (προαιρετικό)</span>
+          <% if (site.cover) { %><div class="logo-preview"><img src="/uploads/<%= site.cover %>" alt=""></div><% } %>
+          <input type="file" name="cover" accept="image/*">
+          <% if (site.cover) { %><label class="check small"><input type="checkbox" name="remove_cover" value="1"> Αφαίρεση</label><% } %>
+        </div>
+        <div class="publish-actions">
+          <button class="btn btn-brand btn-block btn-lg"><%- icon('save') %> Αποθήκευση αλλαγών</button>
+        </div>
+        <p class="muted small unsaved" data-unsaved hidden><%- icon('info') %> Υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί</p>
+      </section>
+    </aside>
+  </div>
+</form>
+<%- include('_footer.html') %>

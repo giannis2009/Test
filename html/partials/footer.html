@@ -1,0 +1,48 @@
+</main>
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <img class="footer-logo" src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>">
+      <p><%= site.tagline %></p>
+      <div class="social">
+        <% if (site.facebook) { %><a href="<%= site.facebook %>" target="_blank" rel="noopener" aria-label="Facebook"><%- icon('facebook') %></a><% } %>
+        <% if (site.instagram) { %><a href="<%= site.instagram %>" target="_blank" rel="noopener" aria-label="Instagram"><%- icon('instagram') %></a><% } %>
+        <% if (site.tiktok) { %><a href="<%= site.tiktok %>" target="_blank" rel="noopener" aria-label="TikTok"><%- icon('tiktok') %></a><% } %>
+        <% if (site.whatsapp) { %><a href="https://wa.me/<%= fmt.tel(site.whatsapp).replace('+', '') %>" target="_blank" rel="noopener" aria-label="WhatsApp"><%- icon('whatsapp') %></a><% } %>
+      </div>
+    </div>
+    <div>
+      <h4>Πλοήγηση</h4>
+      <ul class="footer-links">
+        <li><a href="/cars">Αυτοκίνητα</a></li>
+        <li><a href="/sell">Πούλησε το αυτοκίνητό σου</a></li>
+        <% if (site.finance_enabled === '1') { %><li><a href="/finance">Χρηματοδότηση</a></li><% } %>
+        <li><a href="/about">Η εταιρεία</a></li>
+        <li><a href="/favorites">Αγαπημένα</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Επικοινωνία</h4>
+      <ul class="footer-links footer-contact">
+        <li><%- icon('pin') %><span><%= site.address %><%= site.city ? `, ${site.city}` : '' %></span></li>
+        <% if (site.phone) { %><li><%- icon('phone') %><a href="tel:<%= fmt.tel(site.phone) %>"><%= site.phone %></a></li><% } %>
+        <% if (site.mobile) { %><li><%- icon('phone') %><a href="tel:<%= fmt.tel(site.mobile) %>"><%= site.mobile %></a></li><% } %>
+        <% if (site.email) { %><li><%- icon('mail') %><a href="mailto:<%= site.email %>"><%= site.email %></a></li><% } %>
+      </ul>
+    </div>
+    <div>
+      <h4>Ωράριο</h4>
+      <p class="pre footer-hours"><%- icon('clock') %><span><%= site.hours %></span></p>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>© <%= year %> <%= site.dealer_name %>. Με επιφύλαξη παντός δικαιώματος.</span>
+    <a href="/admin">Διαχείριση</a>
+  </div>
+</footer>
+
+<div class="toast" data-toast role="status" aria-live="polite" hidden></div>
+<script src="/js/site.js" defer></script>
+</body>
+</html>

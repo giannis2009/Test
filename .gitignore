@@ -1,6 +1,9 @@
 node_modules/
-data/*
-!data/.gitkeep
+database/*.db
+database/*.db-*
+data/
 uploads/*
 !uploads/.gitkeep
+save-changes/backups/
+save-changes/deleted-photos/
 .env

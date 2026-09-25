@@ -2,15 +2,15 @@
   "name": "car-dealer-site",
   "version": "1.0.0",
   "description": "Ιστοσελίδα εμπόρου αυτοκινήτων (τύπου car.gr) με Admin Panel",
-  "main": "src/server.js",
+  "main": "server/server.js",
   "private": true,
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
-    "start": "node --no-warnings src/server.js",
-    "dev": "node --no-warnings --watch src/server.js",
-    "seed": "node --no-warnings src/seed.js"
+    "start": "node --no-warnings server/server.js",
+    "dev": "node --no-warnings --watch server/server.js",
+    "seed": "node --no-warnings server/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

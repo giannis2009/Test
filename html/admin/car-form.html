@@ -1,0 +1,134 @@
+<%- include('_header.html') %>
+<%
+  const v = (k) => (car[k] === null || car[k] === undefined ? '' : car[k]);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const select = (name, options, placeholder = '— Επιλέξτε —') => {
+    const cur = String(v(name));
+    const opts = options.includes(cur) || !cur ? options : [cur, ...options];
+    return `<select name="${name}"><option value="">${placeholder}</option>${opts.map(o => `<option${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  };
+  const isEdit = Boolean(car.id);
+%>
+<div class="admin-head">
+  <div>
+    <a class="back-link small" href="/admin/cars"><%- icon('back') %> Όλες οι αγγελίες</a>
+    <h1><%= isEdit ? `${car.make} ${car.model}` : 'Νέα αγγελία' %></h1>
+    <% if (isEdit) { %><p class="muted">#<%= car.id %> · <%- icon('eye') %> <%= car.views %> προβολές · Τελευταία αλλαγή: <%= fmt.date(car.updated_at) %></p><% } %>
+  </div>
+  <% if (isEdit) { %><a class="btn btn-light" href="/admin/preview/<%= car.id %>" target="_blank"><%- icon('external') %> Προβολή στο site</a><% } %>
+</div>
+
+<% if (errors.length) { %><div class="alert alert-error"><% errors.forEach(e => { %><div><%= e %></div><% }) %></div><% } %>
+
+<form method="post" action="<%= isEdit ? `/admin/cars/${car.id}` : '/admin/cars' %>" enctype="multipart/form-data" class="car-form" data-car-form>
+  <input type="hidden" name="_csrf" value="<%= csrf() %>">
+
+  <div class="form-layout">
+    <div class="form-main">
+      <section class="card">
+        <div class="card-head"><h2><%- icon('camera') %> Φωτογραφίες</h2><span class="muted small" data-photo-count><%= car.images.length %> φωτογραφίες</span></div>
+        <p class="muted small">Η πρώτη φωτογραφία είναι η κεντρική. Σύρετε για να αλλάξετε τη σειρά. Έως 40 φωτογραφίες, 15MB η καθεμία (JPG, PNG, WEBP).</p>
+        <div class="image-grid" data-image-grid>
+          <% car.images.forEach(img => { %>
+            <div class="image-item" draggable="true" data-image-id="<%= img.id %>">
+              <img src="/uploads/<%= img.filename %>" alt="">
+              <label class="image-del" title="Διαγραφή"><input type="checkbox" name="delete_images" value="<%= img.id %>"><%- icon('trash') %></label>
+            </div>
+          <% }) %>
+        </div>
+        <input type="hidden" name="image_order" data-image-order>
+        <label class="dropzone" data-dropzone>
+          <input type="file" name="images" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple data-image-input>
+          <span class="dz-ic"><%- icon('download') %></span>
+          <strong data-dz-label>Σύρετε εδώ τις φωτογραφίες ή κάντε κλικ</strong>
+          <span class="muted small">Μπορείτε να επιλέξετε πολλές μαζί</span>
+        </label>
+        <div class="image-grid new-previews" data-new-previews></div>
+      </section>
+
+      <section class="card">
+        <h2><%- icon('car') %> Βασικά στοιχεία</h2>
+        <div class="form-grid">
+          <label class="field"><span>Μάρκα *</span><input name="make" required list="makes" value="<%= v('make') %>" autocomplete="off"></label>
+          <label class="field"><span>Μοντέλο *</span><input name="model" required value="<%= v('model') %>"></label>
+          <label class="field"><span>Κατηγορία</span><%- select('category', C.CATEGORIES) %></label>
+          <label class="field span-2"><span>Έκδοση</span><input name="version" value="<%= v('version') %>" placeholder="π.χ. 1.5 TSI DSG Style"></label>
+          <label class="field"><span>Αμάξωμα</span><%- select('body_type', C.BODY_TYPES) %></label>
+          <label class="field"><span>Κατάσταση οχήματος</span><%- select('condition', C.CONDITIONS) %></label>
+        </div>
+        <datalist id="makes"><% C.MAKES.forEach(m => { %><option value="<%= m %>"><% }) %></datalist>
+      </section>
+
+      <section class="card">
+        <h2><%- icon('gear') %> Τεχνικά χαρακτηριστικά</h2>
+        <div class="form-grid">
+          <div class="field"><span>1η άδεια κυκλοφορίας</span>
+            <div class="range">
+              <select name="month"><option value="">Μήνας</option><% C.MONTHS.forEach((m, i) => { %><option value="<%= i + 1 %>" <%= Number(car.month) === i + 1 ? 'selected' : '' %>><%= m %></option><% }) %></select>
+              <select name="year"><option value="">Έτος</option><% for (let y = year + 1; y >= 1950; y--) { %><option <%= Number(car.year) === y ? 'selected' : '' %>><%= y %></option><% } %></select>
+            </div>
+          </div>
+          <label class="field"><span>Χιλιόμετρα</span><input name="mileage" type="number" min="0" value="<%= v('mileage') %>" inputmode="numeric"></label>
+          <label class="field"><span>Καύσιμο</span><%- select('fuel', C.FUELS) %></label>
+          <label class="field"><span>Σασμάν</span><%- select('gearbox', C.GEARBOXES) %></label>
+          <label class="field"><span>Κυβικά (cc)</span><input name="engine_cc" type="number" min="0" value="<%= v('engine_cc') %>" inputmode="numeric"></label>
+          <label class="field"><span>Ίπποι (hp)</span><input name="power_hp" type="number" min="0" value="<%= v('power_hp') %>" inputmode="numeric"></label>
+          <label class="field"><span>Κίνηση</span><%- select('drivetrain', C.DRIVETRAINS) %></label>
+          <label class="field"><span>Κλάση ρύπων</span><%- select('emission_class', C.EMISSION_CLASSES) %></label>
+          <label class="field"><span>Προηγούμενοι ιδιοκτήτες</span><input name="previous_owners" type="number" min="0" value="<%= v('previous_owners') %>"></label>
+          <label class="field"><span>Πόρτες</span><input name="doors" type="number" min="1" max="7" value="<%= v('doors') %>"></label>
+          <label class="field"><span>Θέσεις</span><input name="seats" type="number" min="1" max="12" value="<%= v('seats') %>"></label>
+          <label class="field"><span>Χρώμα</span><input name="color" list="colors" value="<%= v('color') %>"></label>
+          <label class="field"><span>Χρώμα εσωτερικού</span><input name="interior_color" list="colors" value="<%= v('interior_color') %>"></label>
+          <label class="field"><span>CO₂ (g/km)</span><input name="co2" type="number" min="0" value="<%= v('co2') %>"></label>
+          <label class="field"><span>Κατανάλωση (l/100km)</span><input name="consumption" inputmode="decimal" value="<%= v('consumption') %>"></label>
+        </div>
+        <div class="toggle-row">
+          <label class="switch"><input type="checkbox" name="service_book" value="1" <%= car.service_book ? 'checked' : '' %>><span></span> Βιβλίο service</label>
+          <label class="switch"><input type="checkbox" name="no_accident" value="1" <%= car.no_accident ? 'checked' : '' %>><span></span> Χωρίς ατύχημα</label>
+        </div>
+        <datalist id="colors"><% C.COLORS.forEach(c => { %><option value="<%= c %>"><% }) %></datalist>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2><%- icon('check') %> Εξοπλισμός</h2><span class="muted small" data-feature-count></span></div>
+        <div class="feature-checks">
+          <% C.FEATURES.forEach(f => { %>
+            <label class="feature-check"><input type="checkbox" name="features" value="<%= f %>" <%= car.featureList.includes(f) ? 'checked' : '' %>><span><%= f %></span></label>
+          <% }) %>
+        </div>
+        <label class="field"><span>Επιπλέον εξοπλισμός (ένα ανά γραμμή ή χωρισμένα με κόμμα)</span>
+          <textarea name="features_extra" rows="3"><%= car.featureList.filter(f => !C.FEATURES.includes(f)).join('\n') %></textarea>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2><%- icon('edit') %> Περιγραφή</h2>
+        <textarea name="description" rows="9" placeholder="Γράψτε λεπτομέρειες για το αυτοκίνητο: ιστορικό, service, εγγύηση, κατάσταση…"><%= v('description') %></textarea>
+      </section>
+    </div>
+
+    <aside class="form-side">
+      <section class="card publish-card">
+        <h2>Δημοσίευση</h2>
+        <label class="field"><span>Κατάσταση αγγελίας</span>
+          <select name="status" class="status-select status-<%= car.status %>"><% Object.entries(C.STATUSES).forEach(([k, s]) => { %><option value="<%= k %>" <%= car.status === k ? 'selected' : '' %>><%= s %></option><% }) %></select>
+        </label>
+        <label class="switch"><input type="checkbox" name="featured" value="1" <%= car.featured ? 'checked' : '' %>><span></span> ★ Προτεινόμενο</label>
+        <hr>
+        <label class="field"><span>Τιμή (€)</span>
+          <div class="input-suffix"><input name="price" type="number" min="0" step="1" value="<%= v('price') %>" placeholder="Ρωτήστε τιμή" inputmode="numeric"><span>€</span></div>
+        </label>
+        <label class="switch"><input type="checkbox" name="price_negotiable" value="1" <%= car.price_negotiable ? 'checked' : '' %>><span></span> Συζητήσιμη</label>
+        <label class="switch"><input type="checkbox" name="vat_deductible" value="1" <%= car.vat_deductible ? 'checked' : '' %>><span></span> ΦΠΑ εκπίπτει</label>
+        <div class="publish-actions">
+          <button class="btn btn-brand btn-block btn-lg" type="submit"><%- icon('save') %> Αποθήκευση αλλαγών</button>
+          <% if (!isEdit) { %><button class="btn btn-light btn-block" type="submit" name="after" value="new"><%- icon('plus') %> Αποθήκευση & νέα</button><% } %>
+          <a class="btn btn-light btn-block" href="/admin/cars">Άκυρο</a>
+        </div>
+        <p class="muted small unsaved" data-unsaved hidden><%- icon('info') %> Υπάρχουν αλλαγές που δεν έχουν αποθηκευτεί</p>
+      </section>
+    </aside>
+  </div>
+</form>
+<%- include('_footer.html') %>

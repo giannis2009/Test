@@ -1,0 +1,47 @@
+<%- include('partials/header.html') %>
+
+<section class="page-hero">
+  <div class="container">
+    <nav class="crumbs" aria-label="Διαδρομή"><a href="/">Αρχική</a><span>/</span><span>Η εταιρεία</span></nav>
+    <h1>Η εταιρεία</h1>
+    <p><%= site.tagline %></p>
+  </div>
+</section>
+
+<section class="container section about-grid">
+  <div class="about-text">
+    <span class="kicker">Ποιοι είμαστε</span>
+    <h2 class="section-title"><%= site.dealer_name %></h2>
+    <p class="lead pre"><%= site.about %></p>
+    <div class="hero-cta">
+      <a class="btn btn-brand" href="/cars"><%- icon('car') %> Δείτε τα αυτοκίνητα</a>
+      <a class="btn btn-light" href="/contact"><%- icon('pin') %> Επισκεφθείτε μας</a>
+    </div>
+  </div>
+  <div class="about-logo">
+    <img src="<%= site.logoUrl %>" alt="<%= site.dealer_name %>">
+  </div>
+</section>
+
+<section class="trust-strip">
+  <div class="container trust-grid">
+    <div class="trust-item"><strong><%= site.years_experience %>+</strong><span>Χρόνια εμπειρίας</span></div>
+    <div class="trust-item"><strong><%= totalActive %></strong><span>Αυτοκίνητα διαθέσιμα</span></div>
+    <div class="trust-item"><strong><%= Math.max(Number(site.happy_customers) || 0, soldCount) %>+</strong><span>Πωλήσεις</span></div>
+    <div class="trust-item"><strong><%= site.warranty_months %></strong><span>Μήνες εγγύηση</span></div>
+  </div>
+</section>
+
+<section class="section why">
+  <div class="container">
+    <div class="section-head center"><div><span class="kicker">Οι αξίες μας</span><h2 class="section-title">Τι μας κάνει να ξεχωρίζουμε</h2></div></div>
+    <div class="why-grid">
+      <div class="why-card"><span class="why-ic"><%- icon('shield') %></span><h3>Διαφάνεια</h3><p>Πραγματικά χιλιόμετρα, πλήρες ιστορικό και ξεκάθαρες τιμές χωρίς κρυφές χρεώσεις.</p></div>
+      <div class="why-card"><span class="why-ic"><%- icon('wrench') %></span><h3>Ποιότητα</h3><p>Κάθε αυτοκίνητο ελέγχεται διεξοδικά πριν μπει στη βιτρίνα μας.</p></div>
+      <div class="why-card"><span class="why-ic"><%- icon('users') %></span><h3>Εξυπηρέτηση</h3><p>Σας συνοδεύουμε σε όλη τη διαδικασία: από την επιλογή ως τη μεταβίβαση.</p></div>
+      <div class="why-card"><span class="why-ic"><%- icon('wallet') %></span><h3>Ευελιξία</h3><p>Χρηματοδότηση, ανταλλαγή και λύσεις προσαρμοσμένες στις ανάγκες σας.</p></div>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer.html') %>
