@@ -2,9 +2,9 @@
 <body>
 <header class="topbar">
   <div class="container topbar-inner">
-    <a class="brand" href="/">
-      <% if (site.logo) { %><img src="/uploads/<%= site.logo %>" alt="<%= site.dealer_name %>"><% } else { %><span class="brand-mark"><%= (site.dealer_name || 'C').charAt(0) %></span><% } %>
-      <span class="brand-name"><%= site.dealer_name %></span>
+    <a class="brand" href="/" aria-label="<%= site.dealer_name %>">
+      <img class="brand-icon" src="<%= site.logoUrl %>" alt="">
+      <img class="brand-wordmark" src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>">
     </a>
     <nav class="mainnav" aria-label="Κύριο μενού">
       <a href="/" class="<%= path === '/' ? 'active' : '' %>">Αγγελίες</a>

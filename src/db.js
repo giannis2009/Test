@@ -102,12 +102,16 @@ const DEFAULT_SETTINGS = {
   facebook: '',
   instagram: '',
   logo: '',
+  logo_wide: '',
   cover: '',
-  primary_color: '#e30613',
+  primary_color: '#0c5ba6',
+  secondary_color: '#e7e7e7',
 };
 
 const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insertSetting.run(k, v);
+// Databases created before the brand colours were set still carry the old default red.
+db.prepare("UPDATE settings SET value = ? WHERE key = 'primary_color' AND value = '#e30613'").run(DEFAULT_SETTINGS.primary_color);
 
 // First run: create the admin account. Password must be changed at first login
 // unless ADMIN_PASSWORD was provided explicitly.

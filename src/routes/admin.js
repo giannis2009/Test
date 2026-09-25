@@ -236,20 +236,23 @@ router.post('/inquiries/:id/delete', verifyCsrf, (req, res) => {
 
 /* ---------- Settings ---------- */
 
-const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).filter((k) => !['logo', 'cover'].includes(k));
+const IMAGE_SETTINGS = ['logo', 'logo_wide', 'cover'];
+const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS).filter((k) => !IMAGE_SETTINGS.includes(k));
 
 router.get('/settings', (req, res) => res.render('admin/settings', { title: 'Ρυθμίσεις εμπόρου' }));
 
-router.post('/settings', multipart([{ name: 'logo', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), (req, res) => {
+router.post('/settings', multipart(IMAGE_SETTINGS.map((name) => ({ name, maxCount: 1 }))), (req, res) => {
   const values = {};
   for (const k of SETTING_KEYS) values[k] = String(req.body[k] ?? '').trim();
-  if (!/^#[0-9a-f]{6}$/i.test(values.primary_color)) values.primary_color = DEFAULT_SETTINGS.primary_color;
+  for (const k of ['primary_color', 'secondary_color']) {
+    if (!/^#[0-9a-f]{6}$/i.test(values[k])) values[k] = DEFAULT_SETTINGS[k];
+  }
   for (const k of ['facebook', 'instagram']) {
     if (values[k] && !/^https?:\/\//i.test(values[k])) values[k] = `https://${values[k]}`;
   }
 
   const current = res.locals.site;
-  for (const k of ['logo', 'cover']) {
+  for (const k of IMAGE_SETTINGS) {
     const file = req.files?.[k]?.[0];
     if (file || req.body[`remove_${k}`]) {
       removeUpload(current[k]);

@@ -10,14 +10,22 @@
       <label class="field"><span>Όνομα εμπόρου</span><input name="dealer_name" required value="<%= site.dealer_name %>"></label>
       <label class="field span-2"><span>Σλόγκαν</span><input name="tagline" value="<%= site.tagline %>"></label>
       <label class="field"><span>Κύριο χρώμα</span><input name="primary_color" type="color" value="<%= site.primary_color %>"></label>
+      <label class="field"><span>Δευτερεύον χρώμα</span><input name="secondary_color" type="color" value="<%= site.secondary_color %>"></label>
     </div>
     <div class="form-grid">
       <div class="field">
-        <span>Λογότυπο</span>
-        <% if (site.logo) { %><img class="settings-img logo" src="/uploads/<%= site.logo %>" alt=""><label class="check"><input type="checkbox" name="remove_logo" value="1"> Αφαίρεση</label><% } %>
+        <span>Λογότυπο (εικονίδιο)</span>
+        <img class="settings-img logo" src="<%= site.logoUrl %>" alt="">
+        <% if (site.logo) { %><label class="check"><input type="checkbox" name="remove_logo" value="1"> Επαναφορά προεπιλογής</label><% } %>
         <input type="file" name="logo" accept="image/*">
       </div>
-      <div class="field span-2">
+      <div class="field">
+        <span>Λογότυπο (οριζόντιο, για σκούρο φόντο)</span>
+        <img class="settings-img logo dark" src="<%= site.logoWideUrl %>" alt="">
+        <% if (site.logo_wide) { %><label class="check"><input type="checkbox" name="remove_logo_wide" value="1"> Επαναφορά προεπιλογής</label><% } %>
+        <input type="file" name="logo_wide" accept="image/*">
+      </div>
+      <div class="field">
         <span>Εικόνα εξωφύλλου (banner)</span>
         <% if (site.cover) { %><img class="settings-img" src="/uploads/<%= site.cover %>" alt=""><label class="check"><input type="checkbox" name="remove_cover" value="1"> Αφαίρεση</label><% } %>
         <input type="file" name="cover" accept="image/*">

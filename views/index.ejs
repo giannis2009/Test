@@ -3,7 +3,7 @@
 <section class="dealer-hero"<% if (site.cover) { %> style="background-image: linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.6)), url('/uploads/<%= site.cover %>')"<% } %>>
   <div class="container dealer-hero-inner">
     <div class="dealer-logo">
-      <% if (site.logo) { %><img src="/uploads/<%= site.logo %>" alt=""><% } else { %><span><%= (site.dealer_name || 'C').charAt(0) %></span><% } %>
+      <img src="<%= site.logoUrl %>" alt="">
     </div>
     <div class="dealer-info">
       <h1><%= site.dealer_name %></h1>

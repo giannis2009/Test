@@ -7,7 +7,8 @@
   <meta name="description" content="<%= typeof metaDescription !== 'undefined' ? metaDescription : `${site.dealer_name}: ${site.tagline}. ${site.address}, ${site.city}.` %>">
   <% if (typeof ogImage !== 'undefined' && ogImage) { %><meta property="og:image" content="<%= ogImage %>"><% } %>
   <% if (typeof admin !== 'undefined') { %><meta name="robots" content="noindex"><% } %>
-  <link rel="icon" href="<%= site.logo ? `/uploads/${site.logo}` : '/static/img/no-photo.svg' %>">
+  <link rel="icon" href="<%= site.logoUrl %>">
   <link rel="stylesheet" href="/static/css/style.css">
-  <style>:root { --brand: <%= site.primary_color || '#e30613' %>; }</style>
+  <meta name="theme-color" content="#000000">
+  <style>:root { --brand: <%= site.primary_color || '#0c5ba6' %>; --accent: <%= site.secondary_color || '#e7e7e7' %>; }</style>
 </head>

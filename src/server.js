@@ -53,6 +53,8 @@ app.use(session({
 app.use((req, res, next) => {
   const settings = getSettings();
   delete settings._session_secret;
+  settings.logoUrl = settings.logo ? `/uploads/${settings.logo}` : '/static/img/logo-icon.png';
+  settings.logoWideUrl = settings.logo_wide ? `/uploads/${settings.logo_wide}` : '/static/img/logo-wordmark.png';
   Object.assign(res.locals, {
     site: settings,
     fmt,

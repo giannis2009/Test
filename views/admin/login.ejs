@@ -1,7 +1,7 @@
 <%- include('../partials/head') %>
 <body class="login-body">
   <form method="post" action="/admin/login" class="card login-card stack">
-    <h1><%= site.dealer_name %></h1>
+    <div class="login-logo"><img src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>"></div>
     <p class="muted">Σύνδεση στο Admin Panel</p>
     <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
     <input type="hidden" name="_csrf" value="<%= csrf() %>">

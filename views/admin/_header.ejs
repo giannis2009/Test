@@ -2,7 +2,7 @@
 <body class="admin-body">
 <div class="admin-shell">
   <aside class="admin-side">
-    <a class="admin-brand" href="/admin"><%= site.dealer_name %><small>Admin Panel</small></a>
+    <a class="admin-brand" href="/admin"><img src="<%= site.logoWideUrl %>" alt="<%= site.dealer_name %>"><small>Admin Panel</small></a>
     <nav>
       <a href="/admin" class="<%= path === '/' ? 'active' : '' %>">📊 Πίνακας ελέγχου</a>
       <a href="/admin/cars" class="<%= path.startsWith('/cars') && path !== '/cars/new' ? 'active' : '' %>">🚗 Αγγελίες</a>
