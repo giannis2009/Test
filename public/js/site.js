@@ -206,15 +206,13 @@
   /* ---------- hero ---------- */
   function renderHero() {
     const { site, appearance, socials } = S.site;
-    document.title = `${site.name} — ${site.tagline}`;
+    document.title = `${site.name} — Creative Studio`;
     $('#heroLogo').src = appearance.logoUrl || '/assets/logo.webp';
     $('#heroLogo').alt = site.name;
     $('#footerLogo').src = appearance.logoUrl || '/assets/logo.webp';
     $('#heroHandle').textContent = site.handle;
     $('#heroTagline').textContent = site.tagline;
     $('#heroBio').textContent = site.bio;
-    $('#heroStatus').classList.toggle('hidden', !site.showStatus || !site.status);
-    $('#heroStatusText').textContent = site.status;
     $('#footName').textContent = site.name;
     $('#footText').textContent = site.footer;
     const socialEls = () => socials.map((s) => h('a', {
@@ -291,7 +289,7 @@
     const catName = S.site.categories.find((c) => c.id === a.category_id)?.name;
     const card = h('a', { class: 'album', href: `/album/${a.id}` },
       h('div', { class: 'album-cover' }, cover ? h('img', { src: cover, alt: '', loading: 'lazy' }) : h('div', { class: 'ph', html: icon('image') }),
-        h('span', { class: 'album-count' }, iconEl('image'), `${a.count}`)),
+        null),
       h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, h('strong', {}, a.title),
         h('span', { class: 'album-open' }, 'View album', iconEl('arrow'))));
     card.onclick = (e) => { e.preventDefault(); const img = card.querySelector('img'); if (img) img.style.viewTransitionName = 'product-hero'; navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' }); };
@@ -312,7 +310,7 @@
       h('header', { class: 'album-hero' },
         cover ? h('img', { src: cover, alt: '', style: { viewTransitionName: 'product-hero' } }) : null,
         h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
-          a.description ? h('p', {}, a.description) : null, h('span', { class: 'chip' }, iconEl('image'), `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`))),
+          a.description ? h('p', {}, a.description) : null)),
       photos.length ? h('div', { class: 'gallery album-grid' }, photos.map((m, i) => {
         const media = m.type === 'video' ? h('video', { src: m.url, poster: m.poster || null, muted: true, loop: true, playsinline: true, preload: 'metadata' }) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
         const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media,
@@ -428,7 +426,8 @@
   let pageCleanup = null;
   function slideshow(p) {
     const items = [];
-    for (const src of [p.cover_url, ...(p.gallery || [])].filter(Boolean)) items.push({ type: /\.(mp4|webm|mov)$/i.test(src) ? 'video' : 'img', src });
+    const gallery = (p.gallery || []).filter(Boolean);
+    for (const src of (gallery.length || p.preview_url ? gallery : [p.cover_url].filter(Boolean))) items.push({ type: /\.(mp4|webm|mov)$/i.test(src) ? 'video' : 'img', src });
     const emb = embedUrl(p.preview_url);
     if (emb) items.push({ type: 'embed', src: emb });
     else if (p.preview_url) items.push({ type: 'video', src: p.preview_url, controls: true });
@@ -588,7 +587,7 @@
       pageCleanup?.(); pageCleanup = null;
       $('#productView').classList.add('hidden'); $('#productView').replaceChildren();
       $('#homeView').classList.remove('hidden');
-      document.title = `${S.site.site.name} — ${S.site.site.tagline}`;
+      document.title = `${S.site.site.name} — Creative Studio`;
       if (m || am) toast('That page is no longer available');
       requestAnimationFrame(() => window.scrollTo({ top: homeScroll, behavior: 'instant' }));
     }
