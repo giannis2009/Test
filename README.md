@@ -93,3 +93,11 @@ server/   Express API (auth, shop/PayPal, watch/stream, admin, mailer, SQLite)
 public/   index.html, watch.html, admin.html, css/, js/, assets/
 data/     database, uploads, private videos, outbox (not in git)
 ```
+
+## Online (Render)
+
+1. https://dashboard.render.com → **New → Blueprint** → διάλεξε το repo `giannis2009/Test`.
+2. Συμπλήρωσε `ADMIN_EMAILS`, `PUBLIC_URL`, `GOOGLE_CLIENT_ID` (και PayPal / SMTP όταν τα έχεις) → **Apply**.
+3. Στο Google Cloud (OAuth client) πρόσθεσε το `PUBLIC_URL` στα *Authorized JavaScript origins*.
+
+Η βάση και τα uploads μένουν στον δίσκο `/var/data` (δεν χάνονται σε κάθε ενημέρωση).

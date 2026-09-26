@@ -1,0 +1,47 @@
+# One-click deploy on Render: dashboard.render.com → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: ezro
+    runtime: node
+    plan: starter            # needed for the persistent disk (database + uploads)
+    branch: claude/zealous-bardeen-fbh74g
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/auth/config
+    disk:
+      name: ezro-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data
+      - key: APP_SECRET
+        generateValue: true
+      - key: PUBLIC_URL
+        sync: false          # e.g. https://ezro.onrender.com or your own domain
+      - key: ADMIN_EMAILS
+        sync: false          # your Google email
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
