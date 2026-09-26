@@ -40,6 +40,10 @@ Portfolio, shop, secure video delivery and a full admin panel for **Ezro**.
 
 ## Εκκίνηση
 
+**Ο πιο εύκολος τρόπος:** διπλό κλικ στο `start-windows.bat` (Windows) ή στο `start-mac.command` (Mac). Εγκαθιστά ό,τι χρειάζεται, σε ρωτάει το email σου για admin και ανοίγει το http://localhost:3000.
+
+Χειροκίνητα:
+
 Χρειάζεται **Node.js 22.5+**.
 
 ```bash
