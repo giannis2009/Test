@@ -60,9 +60,20 @@
       </section>
     </div>
 
-    <footer class="statusbar">
+    <div id="details" class="details" hidden role="dialog" aria-label="Connection details">
+      <div class="details-card">
+        <div class="details-head"><h3>Status &amp; details</h3><button id="detailsClose" class="chip">Close</button></div>
+        <dl id="detailsList"></dl>
+        <div class="details-actions">
+          <button id="reconnect" class="chip">Reconnect</button>
+          <button id="copyDetails" class="chip">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="statusbar" id="statusbar" title="Click for details" role="button" tabindex="0">
       <span class="status-left"><i id="dot" class="dot"></i><span id="conn">Connected</span><span class="sep">·</span><span id="sel">0 selected</span></span>
-      <span class="status-right">AppleFX 1.2.0<span class="sep">·</span><span id="appName">Premiere Pro</span></span>
+      <span class="status-right">AppleFX 1.2.1<span class="sep">·</span><span id="appName">Premiere Pro</span></span>
     </footer>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
@@ -71,6 +82,7 @@
   <script src="js/presets.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/preview.js"></script>
+  <script src="js/host_src.js"></script>
   <script src="js/cep.js"></script>
   <script src="js/main.js"></script>
 </body>

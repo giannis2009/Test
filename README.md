@@ -55,6 +55,23 @@ Panel (CEP extension) για **Adobe After Effects 2021+** και **Adobe Premie
 - **Text σε Essential Graphics:** αν ο τίτλος δεν είναι στο κέντρο, το scale γίνεται γύρω από το κέντρο του frame. Για τέλειο αποτέλεσμα, κάνε nest τον τίτλο ή βάλε το anchor στο κέντρο του κειμένου.
 - Το **Ctrl/Cmd+Z** αναιρεί τις αλλαγές.
 
+## Αν γράφει "Not connected"
+
+Πάτα πάνω στη **γραμμή κατάστασης** κάτω στο panel: ανοίγει το **Status & details**. Εκεί θα δεις:
+- αν συνδέθηκε με το πρόγραμμα,
+- την έκδοση του After Effects / Premiere,
+- από πού φορτώθηκε το script,
+- το **ακριβές σφάλμα** (Last error),
+- ποιο composition ή sequence είναι ενεργό,
+- ποια layers, ιδιότητες και keyframes έχεις επιλέξει.
+
+Με το **Reconnect** ξαναπροσπαθεί να συνδεθεί. Με το **Copy** αντιγράφεις όλες τις πληροφορίες για να τις στείλεις.
+
+Συνηθισμένες αιτίες:
+- **"No composition is active"**: άνοιξε ένα composition και κάνε ένα κλικ στο timeline του.
+- **"No sequence is open"** (Premiere): άνοιξε ένα sequence.
+- Αν συνεχίζει να λέει **Not connected**, κλείσε και ξανάνοιξε το panel (Window → Extensions → AppleFX) και πάτα Reconnect. Μετά στείλε το κείμενο από το Copy.
+
 ## Πώς δουλεύει
 
 - Το Premiere scripting API δεν επιτρέπει custom bezier handles στα keyframes, οπότε το AppleFX **“ψήνει” (bakes)** κάθε curve και spring: τη δειγματοληπτεί ανά frame και μετά κρατά μόνο τα keyframes που χρειάζονται (Ramer–Douglas–Peucker, ακρίβεια κάτω από 1 pixel). Η επιλογή **Keyframes → Every frame** κρατά όλα τα keyframes.

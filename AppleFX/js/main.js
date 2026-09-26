@@ -489,17 +489,99 @@
   // ------------------------------------------------------------ selection / status
   var busy = false, lastCtx = null;
   function status(ctx) {
-    var dot = $('dot'), n = ctx && ctx.ok ? ctx.clips.length : 0;
+    var dot = $('dot'), left = document.querySelector('.status-left'), n = ctx && ctx.ok ? ctx.clips.length : 0, text;
     if (!ctx || !ctx.ok) {
-      dot.className = 'dot off';
-      $('conn').textContent = ctx && ctx.hostMissing ? 'Not connected' : 'No sequence';
+      var missing = !!(ctx && ctx.hostMissing);
+      dot.className = missing ? 'dot off' : 'dot mock';
+      $('conn').textContent = missing ? 'Not connected' : (Host.isAE ? 'No composition' : 'No sequence');
+      text = (ctx && ctx.error) || '';
+      left.classList.toggle('err', missing);
     } else {
       dot.className = Host.inHost ? 'dot' : 'dot mock';
       $('conn').textContent = Host.inHost ? 'Connected' : 'Preview mode';
+      var parts = [ctx.sequence, units(n) + ' selected'];
+      if (ctx.selectedKeys) parts.push(ctx.selectedKeys + ' keyframe' + (ctx.selectedKeys === 1 ? '' : 's') + ' selected');
+      text = parts.join(' · ');
+      left.classList.remove('err');
     }
-    $('sel').textContent = units(n) + ' selected';
-    $('apply').classList.toggle('ready', n > 0);
+    $('sel').textContent = text;
+    $('statusbar').title = $('conn').textContent + (text ? ' · ' + text : '') + ' (click for details)';
+    $('apply').classList.toggle('ready', n > 0 || !!(ctx && ctx.ok && ctx.keyedProps));
   }
+
+  // ------------------------------------------------------------ details view
+  var detailRows = [];
+  function row(k, v, cls) { detailRows.push([k, v === undefined || v === null || v === '' ? '-' : String(v), cls || '']); }
+  function renderDetails() {
+    var dl = $('detailsList');
+    dl.innerHTML = '';
+    detailRows.forEach(function (r) {
+      var dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = r[0]; dd.textContent = r[1];
+      if (r[2]) dd.className = r[2];
+      dl.appendChild(dt); dl.appendChild(dd);
+    });
+  }
+  function openDetails() {
+    var box = $('details');
+    box.hidden = false;
+    detailRows = [];
+    row('Status', 'Checking…');
+    renderDetails();
+    Promise.all([Host.diagnostics(), Host.call('getContext')]).then(function (res) {
+      var d = res[0], ctx = res[1], p = current();
+      lastCtx = ctx; status(ctx);
+      detailRows = [];
+      var connected = d.hostScript.indexOf('not answering') !== 0;
+      row('Connection', connected ? (Host.inHost ? 'Connected' : 'Preview mode (browser, nothing is applied)') : 'Not connected', connected ? 'good' : 'bad');
+      row('Application', d.app + (d.appVersion ? ' ' + d.appVersion : ''));
+      row('AppleFX panel', '1.2.1');
+      row('AppleFX script', d.hostScript, connected ? '' : 'bad');
+      row('Script loaded via', d.loadMethod || (d.scriptLoaded ? 'manifest' : 'not loaded'));
+      if (d.lastError) row('Last error', d.lastError, 'bad');
+      row('Extension folder', d.extensionPath);
+      if (ctx.ok) {
+        row(Host.isAE ? 'Composition' : 'Sequence', ctx.sequence);
+        row('Frame', ctx.width + '×' + ctx.height + ' · ' + (Math.round(ctx.fps * 100) / 100) + ' fps');
+        row('Selected ' + UNIT + 's', ctx.clips.length ? ctx.clips.map(function (c) { return c.name; }).join(', ') : 'none');
+        if (Host.isAE) {
+          row('Keyframed properties selected', ctx.keyedProps ? ctx.keyedProps + ' (' + (ctx.propNames || []).join(', ') + ')' : 'none');
+          row('Keyframes selected', ctx.selectedKeys || 0);
+        }
+      } else {
+        row(Host.isAE ? 'Composition' : 'Sequence', ctx.error, 'bad');
+      }
+      row('Preset', p.name + ' (' + p.cat + ')');
+      row('What Apply will do', HINTS[p.cat]);
+      renderDetails();
+    });
+  }
+  function closeDetails() { $('details').hidden = true; }
+  $('statusbar').addEventListener('click', openDetails);
+  $('statusbar').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails(); } });
+  $('detailsClose').addEventListener('click', closeDetails);
+  $('details').addEventListener('click', function (e) { if (e.target === $('details')) closeDetails(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDetails(); });
+  $('reconnect').addEventListener('click', function () {
+    Host.reload().then(function (okLoaded) {
+      toast(okLoaded ? 'Reconnected to ' + Host.label + '.' : 'Still not connected. See "Last error".', okLoaded ? null : 'err');
+      openDetails();
+    });
+  });
+  $('copyDetails').addEventListener('click', function () {
+    var text = detailRows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n');
+    var done = function () { toast('Details copied.'); };
+    try {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } catch (e) { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e2) { toast('Copy failed.', 'err'); }
+      document.body.removeChild(ta);
+    }
+  });
+
   function refreshSelection() {
     if (busy || document.hidden) return Promise.resolve(lastCtx);
     return Host.call('getContext').then(function (ctx) { lastCtx = ctx; status(ctx); return ctx; });

@@ -185,8 +185,17 @@ function makeAE(opts = {}) {
     KeyframeInterpolationType: KIT, PropertyType: PT, PropertyValueType: PVT, MaskMode: { ADD: 6812, NONE: 6816 },
     Math, String, Number, Array, Object, Error, isFinite
   });
+  // ExtendScript globals used by the panel's loader.
+  class File {
+    constructor(p) { this.fsName = p; }
+    get exists() { return fs.existsSync(this.fsName); }
+  }
+  ctx.File = File;
+  ctx.$ = { global: ctx, evalFile: (f) => vm.runInContext(fs.readFileSync(f.fsName || f, 'utf8'), ctx) };
+  ctx.BridgeTalk = { appName: 'aftereffects' };
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'AppleFX', 'jsx', 'host_ae.jsx'), 'utf8');
-  vm.runInContext(src + '\n;this.AppleFX = AppleFX;', ctx);
+  // opts.noHost: start like a fresh After Effects where the manifest's script did not load.
+  if (!opts.noHost) vm.runInContext(src + '\n;this.AppleFX = AppleFX;', ctx);
   return {
     ctx, app, comp, Layer, Property, Shape, KIT,
     undoDepth: () => undoDepth,

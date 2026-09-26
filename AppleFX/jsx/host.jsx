@@ -48,9 +48,9 @@ var AppleFX = (function () {
 
   // ------------------------------------------------------------ sequence helpers
   function activeSeq() {
-    if (!app.project) throw new Error('No project is open.');
+    if (!app.project) throw new Error('No project is open in Premiere Pro.');
     var s = app.project.activeSequence;
-    if (!s) throw new Error('Open a sequence first.');
+    if (!s) throw new Error('No sequence is open. Open a sequence in the timeline.');
     return s;
   }
   function fpsOf(s) {
@@ -312,7 +312,7 @@ var AppleFX = (function () {
   }
 
   // ------------------------------------------------------------ public API
-  function ping() { return ok({ version: '1.2.0', app: app.version }); }
+  function ping() { return ok({ version: '1.2.1', app: app.version }); }
 
   function getContext() {
     try {

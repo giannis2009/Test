@@ -48,8 +48,10 @@ var AppleFX = (function () {
 
   // ------------------------------------------------------------ comp / layers
   function activeComp() {
-    var c = app.project ? app.project.activeItem : null;
-    if (!c || !(c instanceof CompItem)) throw new Error('Open a composition first.');
+    if (!app.project) throw new Error('No project is open in After Effects.');
+    var c = app.project.activeItem;
+    if (!c) throw new Error('No composition is active. Open a composition and click once in its timeline.');
+    if (!(c instanceof CompItem)) throw new Error('"' + c.name + '" is not a composition. Open a composition and click once in its timeline.');
     return c;
   }
   function selectedLayers(c) {
@@ -286,7 +288,7 @@ var AppleFX = (function () {
   }
 
   // ------------------------------------------------------------ public API
-  function ping() { return ok({ version: '1.2.0', app: 'aftereffects ' + app.version }); }
+  function ping() { return ok({ version: '1.2.1', app: 'aftereffects ' + app.version }); }
 
   function getContext() {
     try {
@@ -295,7 +297,15 @@ var AppleFX = (function () {
         L = ls[i];
         clips.push({ track: 0, index: i, layer: L.index, name: L.name, start: L.inPoint, end: L.outPoint, dur: L.outPoint - L.inPoint });
       }
-      return ok({ sequence: c.name, fps: c.frameRate, width: c.width, height: c.height, clips: clips, host: 'AEFT' });
+      var sp = c.selectedProperties, props = 0, keys = 0, names = [];
+      for (i = 0; i < sp.length; i++) {
+        if (easeable(sp[i])) { props++; keys += sp[i].selectedKeys ? sp[i].selectedKeys.length : 0; names.push(sp[i].name); }
+      }
+      return ok({
+        sequence: c.name, fps: c.frameRate, width: c.width, height: c.height, duration: c.duration,
+        layers: c.numLayers, clips: clips, host: 'AEFT',
+        keyedProps: props, selectedKeys: keys, propNames: names
+      });
     } catch (e) { return fail(e); }
   }
 
