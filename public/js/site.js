@@ -11,26 +11,85 @@
   const params = new URLSearchParams(location.search);
 
   const site_logo = () => S.site?.appearance?.logoUrl || '/assets/logo.webp';
-  /* ---------- loading screen ---------- */
+  /* ---------- loading screen: particles, counter, iris exit ---------- */
   const loadStart = performance.now();
-  const ldBar = $('#ldBar');
-  const setProgress = (p) => { if (ldBar) ldBar.style.width = `${p}%`; };
-  setProgress(22);
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let seenIntro = false; try { seenIntro = sessionStorage.getItem('ezro-intro') === '1'; } catch { /* */ }
+  const MIN_INTRO = seenIntro ? 900 : 2600; // full show once per visit, short on reloads
+  let target = 8; let shown = 0; let fx = null;
+  // letters of the tagline appear one by one
+  (() => {
+    const tag = $('#ldTag');
+    if (!tag) return;
+    const text = tag.textContent;
+    tag.replaceChildren(...[...text].map((ch, i) => { const sp = document.createElement('span'); sp.textContent = ch === ' ' ? ' ' : ch; sp.style.animationDelay = `${1.05 + i * 0.035}s`; return sp; }));
+  })();
+  // counter + bar follow real progress but never finish before the intro has played
+  const setProgress = (p) => { target = Math.max(target, p); };
+  (function tick() {
+    const loader = $('#loader');
+    if (!loader) return;
+    const timeCap = Math.min(100, ((performance.now() - loadStart) / MIN_INTRO) * 100);
+    const goal = Math.min(target, timeCap);
+    shown += (goal - shown) * 0.12;
+    const v = Math.round(shown);
+    const c = $('#ldCount'); if (c) c.textContent = String(v).padStart(3, '0');
+    const bar = $('#ldBar'); if (bar) bar.style.width = `${shown}%`;
+    loader.setAttribute('aria-valuenow', String(v));
+    if (!loader.classList.contains('done')) requestAnimationFrame(tick);
+  })();
+  // glowing particles that drift in, orbit the logo and burst outward on exit
+  (function particles() {
+    const cv = $('#ldFx');
+    if (!cv || reduceMotion) return;
+    const ctx = cv.getContext('2d');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let W = 0; let H = 0;
+    const size = () => { W = cv.width = innerWidth * dpr; H = cv.height = innerHeight * dpr; };
+    size(); addEventListener('resize', size);
+    const css = getComputedStyle(document.documentElement);
+    const light = document.documentElement.dataset.theme === 'light';
+    const cols = [css.getPropertyValue('--brand').trim() || '#905abd', css.getPropertyValue('--brand-2').trim() || '#b491dc', light ? '#7a3fb0' : '#ffffff'];
+    const N = innerWidth < 700 ? 55 : 110;
+    const P = Array.from({ length: N }, () => {
+      const a = Math.random() * Math.PI * 2; const r = (0.55 + Math.random() * 0.7) * Math.max(innerWidth, innerHeight) * dpr;
+      return { a, r, tr: (60 + Math.random() * 260) * dpr, s: (0.6 + Math.random() * 2.2) * dpr, w: (Math.random() < 0.5 ? 1 : -1) * (0.002 + Math.random() * 0.006), c: cols[(Math.random() * cols.length) | 0], o: 0, vr: 0 };
+    });
+    let mode = 'in'; let alive = true; let t0 = performance.now();
+    fx = { burst() { mode = 'out'; t0 = performance.now(); P.forEach((p) => { p.vr = (8 + Math.random() * 22) * dpr; }); }, stop() { alive = false; } };
+    (function frame(now) {
+      if (!alive) return;
+      const cx = W / 2; const cy = H * 0.46;
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
+      for (const p of P) {
+        if (mode === 'in') { p.r += (p.tr - p.r) * 0.035; p.o = Math.min(1, p.o + 0.02); }
+        else { p.r += p.vr; p.vr *= 1.04; p.o = Math.max(0, p.o - 0.022); }
+        p.a += p.w;
+        const x = cx + Math.cos(p.a) * p.r; const y = cy + Math.sin(p.a) * p.r * 0.62;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, p.s * 4);
+        g.addColorStop(0, p.c); g.addColorStop(1, 'transparent');
+        ctx.globalAlpha = p.o * 0.85;
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, p.s * 4, 0, Math.PI * 2); ctx.fill();
+      }
+      if (mode === 'out' && now - t0 > 1400) { alive = false; return; }
+      requestAnimationFrame(frame);
+    })(performance.now());
+  })();
   async function hideLoader() {
     const loader = $('#loader');
     if (!loader) return;
     setProgress(100);
-    // the first visit of a session gets the full show; later reloads are quick
-    let seen = false; try { seen = sessionStorage.getItem('ezro-intro') === '1'; sessionStorage.setItem('ezro-intro', '1'); } catch { /* */ }
-    const min = seen ? 650 : 1900;
+    try { sessionStorage.setItem('ezro-intro', '1'); } catch { /* */ }
     await $('#heroLogo')?.decode?.().catch(() => {});
-    const wait = Math.max(0, min - (performance.now() - loadStart));
+    const wait = Math.max(0, MIN_INTRO - (performance.now() - loadStart)) + 380; // let the counter land on 100
     setTimeout(() => {
       loader.classList.add('done');
       loader.setAttribute('aria-busy', 'false');
-      setTimeout(() => document.body.classList.remove('loading'), 250);
-      setTimeout(() => loader.remove(), 1000);
-    }, wait + 250);
+      fx?.burst();
+      document.body.classList.remove('loading'); // the site animates in through the opening iris
+      setTimeout(() => { fx?.stop(); loader.remove(); }, 1500);
+    }, wait);
   }
 
   /* ---------- boot ---------- */
@@ -42,7 +101,7 @@
     setProgress(70);
     // use the logo chosen in Admin → Appearance for the loader too
     const logo = site_logo();
-    if (logo && $('#ldImg') && !$('#ldImg').src.endsWith(logo)) { $('#ldImg').src = logo; $('.ld-shine')?.style.setProperty('--ld-mask', `url("${logo}")`); }
+    if (logo && $('#ldImg') && !$('#ldImg').src.endsWith(logo)) { $$('.ld-img').forEach((i) => { i.src = logo; }); $('.ld-shine')?.style.setProperty('--ld-mask', `url("${logo}")`); }
     E.setCurrency(S.site.checkout.currency);
     E.setTexts(S.site.texts);
     E.applyAppearance(S.site.appearance);
