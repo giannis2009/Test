@@ -10,18 +10,46 @@
   const saveCart = () => { E.store.set('ezro-cart', S.cart); renderNav(); };
   const params = new URLSearchParams(location.search);
 
+  const site_logo = () => S.site?.appearance?.logoUrl || '/assets/logo.webp';
+  /* ---------- loading screen ---------- */
+  const loadStart = performance.now();
+  const ldBar = $('#ldBar');
+  const setProgress = (p) => { if (ldBar) ldBar.style.width = `${p}%`; };
+  setProgress(22);
+  async function hideLoader() {
+    const loader = $('#loader');
+    if (!loader) return;
+    setProgress(100);
+    // the first visit of a session gets the full show; later reloads are quick
+    let seen = false; try { seen = sessionStorage.getItem('ezro-intro') === '1'; sessionStorage.setItem('ezro-intro', '1'); } catch { /* */ }
+    const min = seen ? 650 : 1900;
+    await $('#heroLogo')?.decode?.().catch(() => {});
+    const wait = Math.max(0, min - (performance.now() - loadStart));
+    setTimeout(() => {
+      loader.classList.add('done');
+      loader.setAttribute('aria-busy', 'false');
+      setTimeout(() => document.body.classList.remove('loading'), 250);
+      setTimeout(() => loader.remove(), 1000);
+    }, wait + 250);
+  }
+
   /* ---------- boot ---------- */
   async function boot() {
     try {
       const [site, prod, media] = await Promise.all([api('/api/public/site'), api('/api/public/products'), api('/api/public/media')]);
       S.site = site; S.products = prod.products; S.media = media.media; S.albums = media.albums || [];
-    } catch (e) { fail(e); return; }
+    } catch (e) { fail(e); hideLoader(); return; }
+    setProgress(70);
+    // use the logo chosen in Admin → Appearance for the loader too
+    const logo = site_logo();
+    if (logo && $('#ldImg') && !$('#ldImg').src.endsWith(logo)) { $('#ldImg').src = logo; $('.ld-shine')?.style.setProperty('--ld-mask', `url("${logo}")`); }
     E.setCurrency(S.site.checkout.currency);
     E.setTexts(S.site.texts);
     E.applyAppearance(S.site.appearance);
     // drop cart items that no longer exist / aren't buyable
     S.cart = S.cart.filter((id) => S.products.some((p) => p.id === id && p.status === 'active' && !p.soldOut));
     renderHero(); buildNavCats(); renderWork(); renderShop(); renderNav();
+    hideLoader();
     $('#year').textContent = new Date().getFullYear();
     $$('[data-ic]').forEach((el) => el.replaceChildren(iconEl(el.dataset.ic)));
     E.watchTexts('home');

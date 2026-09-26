@@ -13,7 +13,15 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/site.css">
 </head>
-<body>
+<body class="loading">
+  <div id="loader" role="progressbar" aria-label="Loading" aria-busy="true">
+    <div class="ld-aura"></div>
+    <div class="ld-logo">
+      <img src="/assets/logo.webp" alt="" id="ldImg">
+      <span class="ld-shine"></span>
+    </div>
+    <div class="ld-bar"><span id="ldBar"></span></div>
+  </div>
   <div class="bg-fx" aria-hidden="true"><span class="orb a"></span><span class="orb b"></span><span class="grid"></span></div>
 
   <header class="nav-wrap">
