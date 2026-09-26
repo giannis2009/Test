@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ezro — VFX & Creative Studio</title>
+  <meta name="description" content="Ezro — cover art, 3D art, branding and VFX. Portfolio and shop.">
+  <meta name="theme-color" content="#0d0b12">
+  <meta property="og:title" content="Ezro — VFX & Creative Studio">
+  <meta property="og:image" content="/assets/logo.webp">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <script src="/js/boot.js"></script>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <div class="bg-fx" aria-hidden="true"><span class="orb a"></span><span class="orb b"></span><span class="grid"></span></div>
+
+  <header class="nav-wrap">
+    <nav class="nav glass" aria-label="Main">
+      <a href="#top" class="nav-brand" aria-label="Home"><img src="/assets/favicon.png" alt="" width="26" height="26" id="navIcon"><span id="navName">Ezro</span></a>
+      <div class="nav-links">
+        <a href="#work">Work</a>
+        <a href="#shop">Shop</a>
+        <a href="/watch">Watch</a>
+      </div>
+      <div class="nav-actions" id="navActions"></div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <h1 class="hero-logo"><img id="heroLogo" src="/assets/logo.webp" alt="Ezro" width="1954" height="692"></h1>
+      <p class="hero-handle grad-text" id="heroHandle">@ezrovfx</p>
+      <p class="hero-tagline" id="heroTagline">VFX &amp; Creative Studio</p>
+      <p class="hero-bio" id="heroBio"></p>
+      <div class="hero-status hidden" id="heroStatus"><span class="live"></span><span id="heroStatusText"></span></div>
+      <div class="socials" id="socials"></div>
+      <div class="hero-cta">
+        <a class="btn primary lg" href="#shop">Explore the shop</a>
+        <a class="btn lg" href="#work">View work</a>
+      </div>
+    </section>
+
+    <section class="section" id="work">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Portfolio</p>
+          <h2>Selected work</h2>
+        </div>
+        <div id="workFilter"></div>
+      </div>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <section class="section" id="shop">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Store</p>
+          <h2 id="shopTitle">Shop</h2>
+          <p class="muted section-sub" id="shopSub"></p>
+        </div>
+        <div id="shopFilter"></div>
+      </div>
+      <div class="products" id="products"></div>
+    </section>
+
+    <section class="section">
+      <div class="promise">
+        <div class="promise-item"><span class="promise-ic" data-ic="shield"></span><div><h4>Secure checkout</h4><p class="muted">Pay with PayPal or card. Verified instantly.</p></div></div>
+        <div class="promise-item"><span class="promise-ic" data-ic="key"></span><div><h4>Personal access key</h4><p class="muted">Linked to your Google account only.</p></div></div>
+        <div class="promise-item"><span class="promise-ic" data-ic="invoice"></span><div><h4>Detailed invoice</h4><p class="muted">Sent to your email right after payment.</p></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <img src="/assets/logo.webp" alt="" class="footer-logo" id="footerLogo">
+    <div class="socials small" id="footerSocials"></div>
+    <p class="muted">© <span id="year"></span> <span id="footName">Ezro</span>. <span id="footText">All rights reserved.</span></p>
+    <p class="muted footer-links"><a href="/watch">Video Review</a> · <a href="#shop">Shop</a></p>
+  </footer>
+
+  <script src="/js/core.js"></script>
+  <script src="/js/site.js"></script>
+</body>
+</html>
