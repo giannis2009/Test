@@ -40,6 +40,8 @@ Portfolio, shop, secure video delivery and a full admin panel for **Ezro**.
 
 ## Εκκίνηση
 
+**Αυτόματες ενημερώσεις:** το `start-windows.bat` συνδέει τον φάκελο με το GitHub και κατεβάζει μόνο του κάθε νέα αλλαγή (κάθε ~20 δευτερόλεπτα) όσο τρέχει. Δεν χρειάζεται ξανά zip.
+
 **Ο πιο εύκολος τρόπος:** διπλό κλικ στο `start-windows.bat` (Windows) ή στο `start-mac.command` (Mac). Εγκαθιστά ό,τι χρειάζεται, σε ρωτάει το email σου για admin και ανοίγει το http://localhost:3000.
 
 Χειροκίνητα:

@@ -44,10 +44,18 @@ if not exist .env (
   echo [3/4] .env already exists.
 )
 
-rem ---- 4. Start -------------------------------------------------------------
+rem ---- 4. Git for automatic updates -----------------------------------------
+where git >nul 2>nul
+if errorlevel 1 (
+  echo Installing Git ^(one time, for automatic updates^)...
+  winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements
+  set "PATH=%PATH%;%ProgramFiles%\Git\cmd"
+)
+
+rem ---- 5. Start with auto-update -------------------------------------------
 echo [4/4] Starting Ezro on http://localhost:3000  ^(close this window to stop^)
 start "" http://localhost:3000
-call npm start
+node scripts\live.js
 pause
 exit /b 0
 
