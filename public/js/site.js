@@ -64,8 +64,7 @@
     } else {
       acc = h('button', { class: 'btn sm primary', onclick: () => E.signInSheet('Sign in') }, 'Sign in');
     }
-    const watch = h('a', { class: 'btn icon ghost', href: '/watch', 'aria-label': 'Video Review', title: 'Video Review', html: icon('play') });
-    box.replaceChildren(E.themeButton(), watch, cartBtn, acc);
+    box.replaceChildren(E.themeButton(), cartBtn, acc);
   }
 
   /* ---------- centred category navigation ---------- */
@@ -143,10 +142,27 @@
   /* ---------- work / gallery ---------- */
   let cat = 'all';
   // One category filter drives the nav, the portfolio and the shop.
+  // Old items gently fade/blur out, new ones rise in — no hard jump.
+  function swapContent(render) {
+    const parts = ['#albums', '#gallery', '#products'].map((sel) => $(sel)).filter(Boolean);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || $('#homeView').classList.contains('hidden')) { render(); return; }
+    const out = parts.map((el) => el.animate([{ opacity: 1, filter: 'blur(0)', transform: 'none' }, { opacity: 0, filter: 'blur(6px)', transform: 'translateY(8px) scale(.99)' }],
+      { duration: 180, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }));
+    Promise.all(out.map((a) => a.finished)).then(() => {
+      render();
+      out.forEach((a) => a.cancel());
+      parts.forEach((el) => {
+        $$('.reveal', el).forEach((r) => { r.classList.add('in'); r.style.transitionDelay = '0ms'; });
+        [...el.children].forEach((child, i) => child.animate(
+          [{ opacity: 0, transform: 'translateY(18px) scale(.97)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }],
+          { duration: 560, delay: Math.min(i, 8) * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }));
+      });
+    });
+  }
   function setCategory(id, scroll) {
     cat = String(id);
     navSeg?.set(cat);
-    renderGallery(); renderProducts();
+    swapContent(() => { renderGallery(); renderProducts(); });
     const c = S.site.categories.find((x) => String(x.id) === cat);
     $('#workLabel').textContent = c ? c.name : '';
     $('#shopLabel').textContent = c ? c.name : '';
