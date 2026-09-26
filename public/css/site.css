@@ -30,9 +30,12 @@
 .sec-label { font-size: .5em; font-weight: 700; letter-spacing: .08em; vertical-align: middle; color: var(--brand-2); margin-left: 6px; }
 :root[data-theme="light"] .sec-label { color: var(--brand); }
 @media (max-width: 900px) {
-  .nav { grid-template-columns: minmax(0, 1fr) auto; padding-left: 6px; }
+  .nav { grid-template-columns: minmax(0, 1fr); border-radius: 26px; padding: 6px; gap: 4px; }
+  .nav-cats { grid-row: 1; }
+  .nav-actions { grid-row: 2; justify-content: center !important; }
   .nav-side { display: none; }
-  .nav-cats { justify-content: flex-start; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .nav-cats { justify-content: safe center; overflow: hidden; }
+  .nav-cats.overflow { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
   .nav-cats .seg { max-width: 100%; }
   .nav-seg.seg button { padding: 0 12px; font-size: 11.5px; }
   .nav-actions { gap: 0; }

@@ -77,6 +77,8 @@
       setCategory(String(v), true);
     }, { cls: 'nav-seg' });
     $('#navCats').replaceChildren(navSeg);
+    // fade the right edge only when the categories don't fit (small phones)
+    new ResizeObserver(() => $('#navCats').classList.toggle('overflow', navSeg.scrollWidth > navSeg.clientWidth + 1)).observe(navSeg);
     // the nav becomes a little more solid once the page scrolls
     const nav = $('.nav');
     const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 12);
