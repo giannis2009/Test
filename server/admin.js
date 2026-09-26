@@ -109,7 +109,7 @@ router.put('/settings/:key', (req, res) => {
 });
 
 /* ================= generic reorder ================= */
-const ORDERABLE = { categories: 'categories', media: 'media', products: 'products', socials: 'socials', payment_methods: 'payment_methods' };
+const ORDERABLE = { categories: 'categories', media: 'media', albums: 'albums', products: 'products', socials: 'socials', payment_methods: 'payment_methods' };
 router.put('/reorder/:table', (req, res) => {
   const table = ORDERABLE[req.params.table];
   if (!table) throw new HttpError(404, 'Unknown');
@@ -121,7 +121,7 @@ router.put('/reorder/:table', (req, res) => {
 
 /* ================= categories ================= */
 router.get('/categories', (_req, res) => res.json({
-  categories: all(`SELECT c.*, (SELECT COUNT(*) FROM media m WHERE m.category_id = c.id) media_count,
+  categories: all(`SELECT c.*, (SELECT COUNT(*) FROM media m WHERE m.category_id = c.id) media_count, (SELECT COUNT(*) FROM albums a WHERE a.category_id = c.id) album_count,
     (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) product_count FROM categories c ORDER BY sort, id`),
 }));
 router.post('/categories', (req, res) => {
@@ -156,7 +156,52 @@ router.delete('/categories/:id', (req, res) => {
 /* ================= media (gallery items per category) ================= */
 router.get('/media', (req, res) => {
   const cat = int(req.query.category);
-  res.json({ media: cat ? all('SELECT * FROM media WHERE category_id = ? ORDER BY sort, id', cat) : all('SELECT * FROM media ORDER BY category_id, sort, id') });
+  const album = req.query.album;
+  let rows;
+  if (album === 'none') rows = all('SELECT * FROM media WHERE category_id = ? AND album_id IS NULL ORDER BY sort, id', cat);
+  else if (int(album)) rows = all('SELECT * FROM media WHERE album_id = ? ORDER BY sort, id', int(album));
+  else rows = cat ? all('SELECT * FROM media WHERE category_id = ? ORDER BY sort, id', cat) : all('SELECT * FROM media ORDER BY category_id, sort, id');
+  res.json({ media: rows });
+});
+
+/* ================= albums (cover + all photos, inside a category) ================= */
+router.get('/albums', (req, res) => res.json({
+  albums: all(`SELECT a.*, (SELECT COUNT(*) FROM media m WHERE m.album_id = a.id) count,
+    (SELECT url FROM media m WHERE m.album_id = a.id AND m.type = 'image' ORDER BY m.sort, m.id LIMIT 1) first_url
+    FROM albums a WHERE a.category_id = ? ORDER BY a.sort, a.id`, int(req.query.category)),
+}));
+router.post('/albums', (req, res) => {
+  const b = req.body || {};
+  const cat = get('SELECT id, name FROM categories WHERE id = ?', int(b.category_id));
+  const title = str(b.title, 120);
+  if (!cat || !title) throw new HttpError(400, 'Give the album a name.');
+  const sort = get('SELECT COALESCE(MAX(sort), -1) + 1 s FROM albums WHERE category_id = ?', cat.id).s;
+  const r = run('INSERT INTO albums (category_id, title, description, cover_url, sort, visible, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    cat.id, title, str(b.description, 2000), safeUrl(b.cover_url), sort, b.visible === false ? 0 : 1, now());
+  log(req, 'album.add', title, cat.name);
+  res.json({ id: Number(r.lastInsertRowid) });
+});
+router.put('/albums/:id', (req, res) => {
+  const a = get('SELECT * FROM albums WHERE id = ?', int(req.params.id));
+  if (!a) throw new HttpError(404, 'Not found');
+  const b = req.body || {};
+  const catId = b.category_id ? int(b.category_id) : a.category_id;
+  run('UPDATE albums SET category_id = ?, title = ?, description = ?, cover_url = ?, visible = ? WHERE id = ?',
+    catId, str(b.title ?? a.title, 120) || a.title, str(b.description ?? a.description, 2000),
+    b.cover_url !== undefined ? safeUrl(b.cover_url) : a.cover_url, b.visible === undefined ? a.visible : bool(b.visible) ? 1 : 0, a.id);
+  if (catId !== a.category_id) run('UPDATE media SET category_id = ? WHERE album_id = ?', catId, a.id);
+  log(req, 'album.update', b.title || a.title);
+  res.json({ ok: true });
+});
+router.delete('/albums/:id', (req, res) => {
+  const a = get('SELECT * FROM albums WHERE id = ?', int(req.params.id));
+  if (!a) throw new HttpError(404, 'Not found');
+  const urls = all('SELECT url FROM media WHERE album_id = ?', a.id).map((m) => m.url);
+  run('DELETE FROM media WHERE album_id = ?', a.id);
+  run('DELETE FROM albums WHERE id = ?', a.id);
+  urls.forEach(removeUpload);
+  log(req, 'album.remove', a.title, `${urls.length} photo(s)`);
+  res.json({ ok: true });
 });
 router.post('/media', (req, res) => {
   const b = req.body || {};
@@ -166,8 +211,9 @@ router.post('/media', (req, res) => {
   const type = b.type === 'video' || VID.test(url) ? 'video' : 'image';
   const sort = b.position === 'first' ? (get('SELECT COALESCE(MIN(sort), 1) - 1 s FROM media WHERE category_id = ?', cat.id).s)
     : get('SELECT COALESCE(MAX(sort), -1) + 1 s FROM media WHERE category_id = ?', cat.id).s;
-  const r = run('INSERT INTO media (category_id, type, url, poster, title, caption, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    cat.id, type, url, safeUrl(b.poster), str(b.title, 120), str(b.caption, 500), sort, now());
+  const album = int(b.album_id) ? get('SELECT id FROM albums WHERE id = ? AND category_id = ?', int(b.album_id), cat.id) : null;
+  const r = run('INSERT INTO media (category_id, album_id, type, url, poster, title, caption, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    cat.id, album ? album.id : null, type, url, safeUrl(b.poster), str(b.title, 120), str(b.caption, 500), sort, now());
   log(req, 'media.add', cat.name, `${type}: ${str(b.title, 120) || url}`);
   res.json({ id: Number(r.lastInsertRowid) });
 });
@@ -176,8 +222,10 @@ router.put('/media/:id', (req, res) => {
   if (!m) throw new HttpError(404, 'Not found');
   const b = req.body || {};
   const catId = b.category_id ? int(b.category_id) : m.category_id;
-  run('UPDATE media SET category_id = ?, title = ?, caption = ?, poster = ? WHERE id = ?',
-    catId, str(b.title ?? m.title, 120), str(b.caption ?? m.caption, 500), b.poster !== undefined ? safeUrl(b.poster) : m.poster, m.id);
+  let albumId = b.album_id === undefined ? m.album_id : int(b.album_id) || null;
+  if (albumId && !get('SELECT 1 FROM albums WHERE id = ? AND category_id = ?', albumId, catId)) albumId = null;
+  run('UPDATE media SET category_id = ?, album_id = ?, title = ?, caption = ?, poster = ? WHERE id = ?',
+    catId, albumId, str(b.title ?? m.title, 120), str(b.caption ?? m.caption, 500), b.poster !== undefined ? safeUrl(b.poster) : m.poster, m.id);
   log(req, 'media.update', m.title || m.url, catId !== m.category_id ? 'moved category' : '');
   res.json({ ok: true });
 });
@@ -191,7 +239,7 @@ router.delete('/media/:id', (req, res) => {
 });
 function removeUpload(url) {
   if (!url?.startsWith('/uploads/')) return;
-  const still = get('SELECT 1 FROM media WHERE url = ? UNION SELECT 1 FROM products WHERE cover_url = ? OR gallery LIKE ?', url, url, `%${url}%`);
+  const still = get('SELECT 1 FROM media WHERE url = ? UNION SELECT 1 FROM albums WHERE cover_url = ? UNION SELECT 1 FROM products WHERE cover_url = ? OR gallery LIKE ?', url, url, url, `%${url}%`);
   if (!still) fs.rm(path.join(UPLOAD_DIR, path.basename(url)), { force: true }, () => {});
 }
 

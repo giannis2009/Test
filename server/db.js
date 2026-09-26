@@ -164,6 +164,17 @@ function seed() {
       'Send the total to:\nIBAN: GR00 0000 0000 0000 0000 0000 000\nName: Ezro\nReference: your order number ({number})\n\nYour key is sent as soon as the payment is confirmed.', now());
   }
 }
+/* ---------- migrations ---------- */
+// Albums: a cover + many photos, grouped under a category.
+db.exec(`CREATE TABLE IF NOT EXISTS albums (
+  id INTEGER PRIMARY KEY, category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  title TEXT NOT NULL, description TEXT DEFAULT '', cover_url TEXT, sort INTEGER DEFAULT 0,
+  visible INTEGER DEFAULT 1, created_at INTEGER NOT NULL
+)`);
+if (!all('PRAGMA table_info(media)').some((c) => c.name === 'album_id')) {
+  db.exec('ALTER TABLE media ADD COLUMN album_id INTEGER REFERENCES albums(id) ON DELETE CASCADE');
+}
+
 seed();
 
 module.exports = { db, all, get, run, tx, now, getSetting, setSetting, DEFAULTS, DATA_DIR, UPLOAD_DIR, SECURE_DIR, OUTBOX_DIR };

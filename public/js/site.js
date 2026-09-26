@@ -14,7 +14,7 @@
   async function boot() {
     try {
       const [site, prod, media] = await Promise.all([api('/api/public/site'), api('/api/public/products'), api('/api/public/media')]);
-      S.site = site; S.products = prod.products; S.media = media.media;
+      S.site = site; S.products = prod.products; S.media = media.media; S.albums = media.albums || [];
     } catch (e) { fail(e); return; }
     E.setCurrency(S.site.checkout.currency);
     E.setTexts(S.site.texts);
@@ -71,7 +71,7 @@
   /* ---------- centred category navigation ---------- */
   let navSeg = null;
   function buildNavCats() {
-    const cats = S.site.categories.filter((c) => S.media.some((m) => m.category_id === c.id) || S.products.some((p) => p.category_id === c.id));
+    const cats = S.site.categories.filter((c) => S.media.some((m) => m.category_id === c.id) || S.albums.some((a) => a.category_id === c.id) || S.products.some((p) => p.category_id === c.id));
     navSeg = segmented([['all', 'All'], ...cats.map((c) => [String(c.id), c.name])], cat, (v) => {
       if (location.pathname !== '/') navigate('/');
       setCategory(String(v), true);
@@ -161,8 +161,13 @@
   }
   function renderGallery() {
     const g = $('#gallery');
-    const items = S.media.filter((m) => cat === 'all' || String(m.category_id) === cat);
-    if (!items.length) { g.replaceChildren(h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.')); return; }
+    const inCat = (x) => cat === 'all' || String(x.category_id) === cat;
+    const albums = S.albums.filter(inCat);
+    const items = S.media.filter((m) => inCat(m) && !m.album_id);
+    const ab = $('#albums');
+    ab.replaceChildren(...albums.map((a, i) => E.reveal(albumCard(a), (i % 6) * 60)));
+    ab.classList.toggle('hidden', !albums.length);
+    if (!items.length) { g.replaceChildren(albums.length ? '' : h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.')); return; }
     g.replaceChildren(...items.map((m, i) => {
       const media = m.type === 'video'
         ? h('video', { src: m.url, poster: m.poster || null, muted: true, loop: true, playsinline: true, preload: 'metadata' })
@@ -177,6 +182,49 @@
       return E.reveal(tile, (i % 6) * 60);
     }));
   }
+  // Album card: the cover + title + photo count; opens the album page.
+  function albumCard(a) {
+    const cover = a.cover_url || a.first_url;
+    const catName = S.site.categories.find((c) => c.id === a.category_id)?.name;
+    const card = h('a', { class: 'album', href: `/album/${a.id}` },
+      h('div', { class: 'album-cover' }, cover ? h('img', { src: cover, alt: '', loading: 'lazy' }) : h('div', { class: 'ph', html: icon('image') }),
+        h('span', { class: 'album-count' }, iconEl('image'), `${a.count}`)),
+      h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, h('strong', {}, a.title),
+        h('span', { class: 'album-open' }, 'View album', iconEl('arrow'))));
+    card.onclick = (e) => { e.preventDefault(); const img = card.querySelector('img'); if (img) img.style.viewTransitionName = 'product-hero'; navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' }); };
+    tilt(card);
+    return card;
+  }
+  function renderAlbumPage(a) {
+    pageCleanup?.();
+    const view = $('#productView');
+    const photos = S.media.filter((m) => m.album_id === a.id);
+    const catObj = S.site.categories.find((c) => c.id === a.category_id);
+    const cover = a.cover_url || a.first_url;
+    document.title = `${a.title} — ${S.site.site.name}`;
+    const others = S.albums.filter((x) => x.id !== a.id && x.category_id === a.category_id).slice(0, 3);
+    view.replaceChildren(h('div', { class: 'pp album-page' },
+      h('div', { class: 'pp-top' }, h('button', { class: 'btn sm', onclick: () => (history.state?.fromHome ? history.back() : navigate('/')) }, iconEl('chevron-left'), 'Back'),
+        catObj ? h('button', { class: 'crumb', onclick: () => { navigate('/'); setCategory(String(catObj.id), true); } }, catObj.name) : null),
+      h('header', { class: 'album-hero' },
+        cover ? h('img', { src: cover, alt: '', style: { viewTransitionName: 'product-hero' } }) : null,
+        h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
+          a.description ? h('p', {}, a.description) : null, h('span', { class: 'chip' }, iconEl('image'), `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`))),
+      photos.length ? h('div', { class: 'gallery album-grid' }, photos.map((m, i) => {
+        const media = m.type === 'video' ? h('video', { src: m.url, poster: m.poster || null, muted: true, loop: true, playsinline: true, preload: 'metadata' }) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
+        const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media,
+          m.type === 'video' ? h('span', { class: 'play-badge', html: icon('play') }) : null);
+        if (m.type === 'video') { tile.onmouseenter = () => media.play().catch(() => {}); tile.onmouseleave = () => media.pause(); }
+        tile.onclick = () => lightbox(photos, i);
+        tile.onkeydown = (e) => e.key === 'Enter' && lightbox(photos, i);
+        tilt(tile);
+        return E.reveal(tile, (i % 6) * 50);
+      })) : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
+      others.length ? h('div', { class: 'pp-more' }, h('h2', {}, 'More albums'), h('div', { class: 'albums' }, others.map(albumCard))) : null));
+    pageCleanup = null;
+    E.applyTexts(view, 'home');
+  }
+
   function lightbox(items, index) {
     let i = index;
     const stage = h('div');
@@ -424,19 +472,21 @@
   let homeScroll = 0;
   function route() {
     const m = location.pathname.match(/^\/product\/([^/]+)/);
+    const am = location.pathname.match(/^\/album\/(\d+)/);
     const p = m && S.products.find((x) => x.slug === decodeURIComponent(m[1]));
-    $$('.p-media img').forEach((img) => { img.style.viewTransitionName = ''; });
-    if (p) {
+    const al = am && S.albums.find((x) => x.id === Number(am[1]));
+    $$('.p-media img, .album-cover img').forEach((img) => { img.style.viewTransitionName = ''; });
+    if (p || al) {
       if (!$('#homeView').classList.contains('hidden')) homeScroll = window.scrollY;
       $('#homeView').classList.add('hidden'); $('#productView').classList.remove('hidden');
-      renderProductPage(p);
+      if (p) renderProductPage(p); else renderAlbumPage(al);
       window.scrollTo({ top: 0, behavior: 'instant' });
     } else {
       pageCleanup?.(); pageCleanup = null;
       $('#productView').classList.add('hidden'); $('#productView').replaceChildren();
       $('#homeView').classList.remove('hidden');
       document.title = `${S.site.site.name} — ${S.site.site.tagline}`;
-      if (m) toast('That product is no longer available');
+      if (m || am) toast('That page is no longer available');
       requestAnimationFrame(() => window.scrollTo({ top: homeScroll, behavior: 'instant' }));
     }
     renderNav();

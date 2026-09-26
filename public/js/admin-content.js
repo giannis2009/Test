@@ -8,14 +8,15 @@
 
   /* ================= Categories & Media ================= */
   let selCat = null;
+  let selAlbum = 'none'; // 'none' = photos that are not in an album
   A.pages.media = async () => {
     const { categories } = await api('/api/admin/categories');
     if (!categories.some((c) => c.id === selCat)) selCat = categories[0]?.id ?? null;
     const catList = h('div', { class: 'list' });
-    const mediaPanel = h('div');
+    const mediaPanel = h('div', { style: { display: 'grid', gap: '18px', alignContent: 'start' } });
     const drawCats = () => catList.replaceChildren(...categories.map((c) => h('div', { class: `lrow ${c.id === selCat ? 'on' : ''}`, dataset: { id: c.id }, style: { cursor: 'pointer' }, onclick: () => { selCat = c.id; drawCats(); loadMedia(); } },
       h('span', { class: 'handle', html: icon('grip') }), h('div', { class: 'ic', html: icon(c.icon) }),
-      h('div', { class: 'tt' }, h('strong', {}, c.name), h('span', {}, `${c.media_count} item${c.media_count === 1 ? '' : 's'} · ${c.product_count} product${c.product_count === 1 ? '' : 's'}${c.visible ? '' : ' · hidden'}`)),
+      h('div', { class: 'tt' }, h('strong', {}, c.name), h('span', {}, `${c.album_count} album${c.album_count === 1 ? '' : 's'} · ${c.media_count} item${c.media_count === 1 ? '' : 's'} · ${c.product_count} product${c.product_count === 1 ? '' : 's'}${c.visible ? '' : ' · hidden'}`)),
       h('button', { class: 'btn icon sm ghost', 'aria-label': 'Edit category', html: icon('edit'), onclick: (e) => { e.stopPropagation(); editCategory(c); } }))));
     drawCats();
     E.dragSort({ containers: [catList], item: '.lrow', handle: '.handle', onDrop: () => A.reorder('categories', $$('.lrow', catList).map((r) => Number(r.dataset.id))) });
@@ -23,7 +24,20 @@
     async function loadMedia() {
       const cat = categories.find((c) => c.id === selCat);
       if (!cat) { mediaPanel.replaceChildren(A.panel('Media', h('div', { class: 'empty' }, 'Create a category first.'))); return; }
-      const { media } = await api(`/api/admin/media?category=${cat.id}`);
+      const { albums } = await api(`/api/admin/albums?category=${cat.id}`);
+      if (selAlbum !== 'none' && !albums.some((a) => a.id === selAlbum)) selAlbum = 'none';
+      const album = albums.find((a) => a.id === selAlbum);
+      const { media } = await api(`/api/admin/media?category=${cat.id}&album=${album ? album.id : 'none'}`);
+      // album strip: every album with its cover, plus "photos without album"
+      const albumStrip = h('div', { class: 'album-strip' },
+        h('button', { type: 'button', class: `al-card loose ${!album ? 'on' : ''}`, onclick: () => { selAlbum = 'none'; loadMedia(); } },
+          h('div', { class: 'al-cv', html: icon('image') }), h('strong', {}, 'Without album')),
+        albums.map((a) => h('button', { type: 'button', class: `al-card ${album?.id === a.id ? 'on' : ''}`, dataset: { id: a.id }, onclick: () => { selAlbum = a.id; loadMedia(); } },
+          h('div', { class: 'al-cv' }, a.cover_url || a.first_url ? h('img', { src: a.cover_url || a.first_url, alt: '' }) : iconEl('image'),
+            h('span', { class: 'handle', html: icon('grip'), title: 'Drag to reorder' })),
+          h('strong', {}, a.title), h('span', {}, `${a.count} photo${a.count === 1 ? '' : 's'}${a.visible ? '' : ' · hidden'}`))),
+        h('button', { type: 'button', class: 'al-card add', 'data-drop-end': '', onclick: () => editAlbum(null, cat, categories, loadMedia) }, h('div', { class: 'al-cv', html: icon('plus') }), h('strong', {}, 'New album')));
+      E.dragSort({ containers: [albumStrip], item: '.al-card[data-id]', handle: '.handle', onDrop: () => A.reorder('albums', $$('.al-card[data-id]', albumStrip).map((x) => Number(x.dataset.id))) });
       let position = 'last';
       const grid = h('div', { class: 'mgrid' }, media.map((m) => h('div', { class: 'mitem', dataset: { id: m.id } },
         m.type === 'video' ? h('video', { src: m.url, muted: true, loop: true, playsinline: true, onmouseenter: (e) => e.target.play().catch(() => {}), onmouseleave: (e) => e.target.pause() }) : h('img', { src: m.url, alt: m.title || '' }),
@@ -44,25 +58,59 @@
         for (const [i, file] of list.entries()) {
           try {
             const r = await E.upload('/api/admin/upload', file, (p) => { bar.firstChild.style.width = `${((i + p) / list.length) * 100}%`; });
-            await api('/api/admin/media', { body: { category_id: cat.id, url: r.url, type: r.type, title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), position } });
+            await api('/api/admin/media', { body: { category_id: cat.id, album_id: album?.id || null, url: r.url, type: r.type, title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), position } });
           } catch (e) { fail(e); }
         }
-        toast(`${files.length} item${files.length > 1 ? 's' : ''} added to ${cat.name}`, 'success');
+        toast(`${files.length} item${files.length > 1 ? 's' : ''} added to ${album ? album.title : cat.name}`, 'success');
         fileIn.value = ''; loadMedia();
       };
       const addUrl = h('button', { class: 'btn' }, iconEl('link'), 'Add by link');
-      addUrl.onclick = () => editMedia({ category_id: cat.id, url: '', title: '', caption: '' }, categories, loadMedia);
-      mediaPanel.replaceChildren(A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' } }, cat.name, h('span', { class: 'count' }, media.length),
-        h('span', { style: { marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } }, segmented([['first', 'Add to start'], ['last', 'Add to end']], position, (v) => { position = v; }), addUrl, upBtn)),
-      fileIn, bar, h('p', { class: 'desc', style: { marginTop: '0' } }, 'Drag the grip to change the order shown on the site.'),
-      media.length ? grid : h('div', { class: 'empty' }, iconEl('image'), 'No images or videos in this category yet.')));
+      addUrl.onclick = () => editMedia({ category_id: cat.id, album_id: album?.id || null, url: '', title: '', caption: '' }, categories, loadMedia);
+      const albumBtn = album ? h('button', { class: 'btn' }, iconEl('edit'), 'Album settings') : null;
+      if (albumBtn) albumBtn.onclick = () => editAlbum(album, cat, categories, loadMedia, media);
+      mediaPanel.replaceChildren(
+        A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 } }, `${cat.name} — albums`, h('span', { class: 'count' }, albums.length)),
+          h('p', { class: 'desc' }, 'Each album shows on the site with its cover. Clicking it opens all its photos. Drag to reorder.'), albumStrip),
+        A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' } }, album ? album.title : 'Photos without album', h('span', { class: 'count' }, media.length),
+          h('span', { style: { marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } }, albumBtn, segmented([['first', 'Add to start'], ['last', 'Add to end']], position, (v) => { position = v; }), addUrl, upBtn)),
+        fileIn, bar, h('p', { class: 'desc', style: { marginTop: '0' } }, album ? 'These photos open when someone clicks the album. Drag the grip to change the order.' : 'Shown on their own in the category, outside any album. Drag the grip to change the order.'),
+        media.length ? grid : h('div', { class: 'empty' }, iconEl('image'), album ? 'This album is empty — upload its photos.' : 'No loose images or videos in this category.')));
     }
     await loadMedia();
-    return [A.head('Categories & Media', 'Your portfolio categories and the images / videos inside each one.', A.btn('Add Category', 'plus', () => editCategory(null), 'primary')),
+    return [A.head('Categories & Media', 'Categories → albums (with a cover) → all their photos.', A.btn('Add Category', 'plus', () => editCategory(null), 'primary')),
       h('div', { class: 'page' }, h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) minmax(0, 1fr)', gap: '18px', alignItems: 'start' }, class: 'media-layout' },
         A.panel(h('span', {}, 'Categories'), catList.childElementCount ? catList : h('div', { class: 'empty' }, 'No categories')), mediaPanel)),
       h('style', {}, '@media (max-width: 900px) { .media-layout { grid-template-columns: 1fr !important; } }')];
   };
+  function editAlbum(a, cat, categories, reload, photos = []) {
+    const isNew = !a;
+    a = a || { title: '', description: '', cover_url: '', visible: 1, category_id: cat.id };
+    const title = input(a.title, { placeholder: 'e.g. Summer Drop 2026', autofocus: true });
+    const desc = textarea(a.description, { placeholder: 'Optional — shown on the album page', style: { minHeight: '70px' } });
+    const cover = E.uploadBox({ value: a.cover_url || '', label: 'Cover image (portrait 4:5 looks best)' });
+    const pick = photos.filter((m) => m.type === 'image').length ? h('div', { class: 'mgrid', style: { gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))' } },
+      photos.filter((m) => m.type === 'image').map((m) => h('button', { type: 'button', class: 'mitem', style: { padding: 0, cursor: 'pointer' }, title: 'Use as cover', onclick: () => { cover.set(m.url); toast('Cover set — save to apply'); } }, h('img', { src: m.url, alt: '' })))) : null;
+    const catSel = select(categories.map((c) => ({ value: c.id, label: c.name, icon: c.icon })), a.category_id);
+    const visible = toggle(!!a.visible, 'Visible on the site');
+    const save = h('button', { class: 'btn primary' }, isNew ? 'Create album' : 'Save');
+    save.onclick = () => withBusy(save, async () => {
+      try {
+        const body = { title: title.value, description: desc.value, cover_url: cover.value, visible: visible.checked, category_id: catSel.value };
+        const r = await api(isNew ? '/api/admin/albums' : `/api/admin/albums/${a.id}`, { method: isNew ? 'POST' : 'PUT', body });
+        if (isNew) selAlbum = r.id;
+        toast(isNew ? 'Album created — now upload its photos' : 'Album saved', 'success'); s.close(); reload();
+      } catch (e) { fail(e); }
+    });
+    const foot = [];
+    if (!isNew) foot.push(A.btn('Delete album', 'trash', async () => {
+      if (!(await E.confirmDialog(`Delete “${a.title}”?`, `This also deletes its ${a.count} photo(s).`, { ok: 'Delete', danger: true }))) return;
+      await api(`/api/admin/albums/${a.id}`, { method: 'DELETE' }).catch(fail); selAlbum = 'none'; s.close(); reload();
+    }, 'danger'));
+    foot.push(h('div', { class: 'spacer' }), visible, save);
+    const s = sheet({ title: isNew ? 'New album' : `Album — ${a.title}`, size: 'wide', foot,
+      body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Album name', title), field('Category', catSel)), field('Description', desc),
+        field('Cover', cover, 'If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null) });
+  }
   function editCategory(c) {
     const isNew = !c;
     c = c || { icon: 'sparkles', visible: 1 };
@@ -92,7 +140,7 @@
     const save = h('button', { class: 'btn primary' }, 'Save');
     save.onclick = () => withBusy(save, async () => {
       try {
-        if (isNew) await api('/api/admin/media', { body: { category_id: cat.value, url: url.value, title: title.value, caption: caption.value, poster: poster.value } });
+        if (isNew) await api('/api/admin/media', { body: { category_id: cat.value, album_id: String(cat.value) === String(m.category_id) ? m.album_id : null, url: url.value, title: title.value, caption: caption.value, poster: poster.value } });
         else await api(`/api/admin/media/${m.id}`, { method: 'PUT', body: { category_id: cat.value, title: title.value, caption: caption.value, poster: poster.value } });
         toast('Saved', 'success'); s.close(); reload();
       } catch (e) { fail(e); }

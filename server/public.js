@@ -41,8 +41,15 @@ router.get('/site', (_req, res) => {
 });
 
 router.get('/media', (_req, res) => {
-  res.json({ media: all(`SELECT m.id, m.category_id, m.type, m.url, m.poster, m.title, m.caption FROM media m
-    JOIN categories c ON c.id = m.category_id WHERE c.visible = 1 ORDER BY m.sort, m.id`) });
+  res.json({
+    media: all(`SELECT m.id, m.category_id, m.album_id, m.type, m.url, m.poster, m.title, m.caption FROM media m
+      JOIN categories c ON c.id = m.category_id LEFT JOIN albums a ON a.id = m.album_id
+      WHERE c.visible = 1 AND (m.album_id IS NULL OR a.visible = 1) ORDER BY m.sort, m.id`),
+    albums: all(`SELECT a.id, a.category_id, a.title, a.description, a.cover_url,
+      (SELECT COUNT(*) FROM media m WHERE m.album_id = a.id) count,
+      (SELECT url FROM media m WHERE m.album_id = a.id AND m.type = 'image' ORDER BY m.sort, m.id LIMIT 1) first_url
+      FROM albums a JOIN categories c ON c.id = a.category_id WHERE a.visible = 1 AND c.visible = 1 ORDER BY a.sort, a.id`),
+  });
 });
 
 router.get('/products', (_req, res) => {
