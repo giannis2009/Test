@@ -314,116 +314,91 @@
   background: linear-gradient(var(--bg) 35%, color-mix(in srgb, var(--bg) 0%, transparent));
 }
 
-/* ================= Loading screen (cinematic intro) ================= */
-@property --hole { syntax: "<length>"; inherits: false; initial-value: 0px; }
+/* ================= Loading screen: spotlight reveal → morph into the hero logo ================= */
+@property --sx { syntax: "<percentage>"; inherits: true; initial-value: -30%; }
+@property --sr { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
 #loader {
-  --hole: 0px; --d: 1.35s; /* --d: when the real logo takes over from the particles */
-  position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; overflow: hidden; perspective: 1100px;
-  background: radial-gradient(ellipse at 50% 44%, color-mix(in srgb, var(--brand) 20%, var(--bg)) 0%, var(--bg) 58%);
-  -webkit-mask: radial-gradient(circle at 50% 44%, transparent var(--hole), #000 calc(var(--hole) + 2px));
-  mask: radial-gradient(circle at 50% 44%, transparent var(--hole), #000 calc(var(--hole) + 2px));
-  animation: ldFailsafe 0s 11s forwards; /* never block the site */
+  --d: 0s; /* start offset */
+  position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; overflow: hidden;
+  background: var(--bg);
+  animation: ldFailsafe 0s 9s forwards; /* never block the site */
 }
-#loader.quick { --d: .25s; }
-#loader::after { /* vignette */
+#loader::before { /* faint floor glow */
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 45%, transparent 45%, color-mix(in srgb, #000 55%, transparent) 100%);
+  background: radial-gradient(ellipse 60% 45% at 50% 50%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%);
+  opacity: 0; animation: ldFade 1.6s .2s ease-out forwards;
 }
-:root[data-theme="light"] #loader::after { background: radial-gradient(ellipse at 50% 45%, transparent 55%, color-mix(in srgb, var(--brand) 12%, transparent) 100%); }
-#ldFx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
-.ld-rays {
-  position: absolute; left: 50%; top: 44%; width: 170vmax; aspect-ratio: 1; translate: -50% -50%; pointer-events: none; opacity: 0;
-  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--brand-2) 22%, transparent) 0deg 3deg, transparent 3deg 14deg);
-  -webkit-mask: radial-gradient(circle, #000 0%, transparent 30%); mask: radial-gradient(circle, #000 0%, transparent 30%);
-  animation: ldRaysIn 1.6s calc(var(--d) - .2s) ease-out forwards, ldSpin 40s linear infinite;
+.ld-stage { position: relative; display: grid; justify-items: center; gap: 26px; filter: drop-shadow(0 22px 50px color-mix(in srgb, var(--brand) 55%, transparent)); }
+.ld-logo {
+  position: relative; width: min(var(--hero-size, 420px), 86vw); aspect-ratio: 1954 / 692;
+  --sx: -30%; --sr: 0%;
+  -webkit-mask: radial-gradient(ellipse var(--sr) 140% at var(--sx) 50%, #000 55%, transparent 100%);
+  mask: radial-gradient(ellipse var(--sr) 140% at var(--sx) 50%, #000 55%, transparent 100%);
+  animation: ldSpot 1.9s .25s cubic-bezier(.65, 0, .35, 1) forwards, ldBloom 1.1s 1.75s ease-out both;
+  will-change: transform;
 }
-.ld-aura {
-  position: absolute; left: 50%; top: 44%; width: min(760px, 115vw); aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; pointer-events: none;
-  background: conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--brand) 60%, transparent), transparent 35%, color-mix(in srgb, var(--brand-2) 50%, transparent), transparent 70%);
-  filter: blur(70px); opacity: 0; animation: ldAuraIn 1.6s .1s ease-out forwards, ldSpin 9s linear infinite;
+.ld-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* moving light that travels with the spotlight */
+.ld-spot {
+  position: absolute; left: 50%; top: 50%; width: min(520px, 90vw); aspect-ratio: 2.4; translate: -50% -58%; pointer-events: none;
+  --sx: -30%;
+  background: radial-gradient(ellipse 30% 60% at var(--sx) 50%, color-mix(in srgb, var(--brand-2) 55%, transparent), transparent 70%);
+  filter: blur(30px); animation: ldSpotLight 1.9s .25s cubic-bezier(.65, 0, .35, 1) forwards;
 }
-.ld-stage { position: relative; z-index: 2; margin-top: -12vh; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
-.ld-logo { position: relative; width: min(420px, 74vw); aspect-ratio: 1954 / 692; filter: drop-shadow(0 20px 46px color-mix(in srgb, var(--brand) 55%, transparent)); }
-.ld-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.ld-main { clip-path: inset(0 100% 0 0); animation: ldWipe 1s var(--d) cubic-bezier(.77, 0, .18, 1) forwards, ldFocus 1.1s var(--d) ease-out both; }
-.ld-r, .ld-c { mix-blend-mode: screen; opacity: 0; clip-path: inset(0 100% 0 0); }
-.ld-r { filter: brightness(.9) sepia(1) saturate(9) hue-rotate(-40deg); animation: ldWipe 1s var(--d) cubic-bezier(.77, 0, .18, 1) forwards, ldGlitchR 1.25s var(--d) steps(1, end) forwards; }
-.ld-c { filter: brightness(.9) sepia(1) saturate(9) hue-rotate(140deg); animation: ldWipe 1s var(--d) cubic-bezier(.77, 0, .18, 1) forwards, ldGlitchC 1.25s var(--d) steps(1, end) forwards; }
-:root[data-theme="light"] .ld-r, :root[data-theme="light"] .ld-c { mix-blend-mode: multiply; }
-.ld-edge {
-  position: absolute; top: -14%; bottom: -14%; left: 0; width: 3px; border-radius: 3px; pointer-events: none; opacity: 0;
-  background: linear-gradient(transparent, #fff 30%, #fff 70%, transparent);
-  box-shadow: 0 0 18px 4px var(--brand-2), 0 0 70px 14px color-mix(in srgb, var(--brand) 70%, transparent);
-  animation: ldEdge 1s var(--d) cubic-bezier(.77, 0, .18, 1) forwards;
-}
+/* chrome highlight that keeps sliding across the letters while we wait */
 .ld-shine {
   position: absolute; inset: 0; pointer-events: none; opacity: 0;
-  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .95) 47%, rgba(255, 255, 255, .25) 54%, transparent 66%);
+  background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, .9) 47%, rgba(255, 255, 255, .2) 53%, transparent 64%);
   background-size: 260% 100%; background-position: 130% 0; mix-blend-mode: overlay;
   -webkit-mask: var(--ld-mask, url(/assets/logo.webp)) center / contain no-repeat; mask: var(--ld-mask, url(/assets/logo.webp)) center / contain no-repeat;
-  animation: ldShine 2.4s calc(var(--d) + 1s) cubic-bezier(.45, 0, .2, 1) infinite;
+  animation: ldShine 2.6s 2.1s cubic-bezier(.45, 0, .2, 1) infinite;
 }
-/* glossy floor reflection */
-.ld-reflect {
-  position: absolute; left: 0; top: calc(100% + 6px); width: 100%; aspect-ratio: 1954 / 692; transform: scaleY(-1); opacity: 0; pointer-events: none;
-  -webkit-mask: linear-gradient(to top, rgba(0, 0, 0, .55), transparent 62%); mask: linear-gradient(to top, rgba(0, 0, 0, .55), transparent 62%);
-  filter: blur(1.5px); animation: ldReflect 1s calc(var(--d) + .5s) ease-out forwards;
+/* little four-point glints on the letters */
+.ld-glints { position: absolute; inset: 0; pointer-events: none; }
+.ld-glints i {
+  position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; opacity: 0; transform: scale(0) rotate(0deg);
+  background: radial-gradient(circle, #fff 0 12%, transparent 13%), conic-gradient(from 0deg, transparent 0 20%, rgba(255, 255, 255, .95) 25%, transparent 30% 45%, rgba(255, 255, 255, .95) 50%, transparent 55% 70%, rgba(255, 255, 255, .95) 75%, transparent 80% 95%, rgba(255, 255, 255, .95) 100%);
+  -webkit-mask: radial-gradient(circle, #000 0 20%, transparent 70%); mask: radial-gradient(circle, #000 0 20%, transparent 70%);
+  filter: drop-shadow(0 0 6px var(--brand-2));
+  animation: ldGlint 1.2s cubic-bezier(.3, 0, .2, 1) forwards;
 }
-.ld-tag { position: absolute; left: 50%; top: 162%; translate: -50% 0; margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .5em; text-indent: .5em; color: var(--text-2); white-space: nowrap; }
-.ld-tag span { display: inline-block; opacity: 0; transform: translateY(10px); filter: blur(6px); animation: ldLetter .7s cubic-bezier(.16, 1, .3, 1) forwards; }
-.ld-foot { position: absolute; z-index: 2; left: 50%; bottom: calc(max(40px, 8vh) + 6vh); translate: -50% 0; display: grid; justify-items: center; gap: 12px; animation: ldFootIn .8s .5s ease-out both; }
-.ld-count { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .2em; color: var(--muted); font-variant-numeric: tabular-nums; }
-.ld-count::after { content: "%"; margin-left: 2px; opacity: .6; }
-.ld-bar { position: relative; width: min(200px, 46vw); height: 2px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--text) 10%, transparent); }
-.ld-bar span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 2px; background: var(--brand-grad); box-shadow: 0 0 12px var(--brand); }
-/* film grain */
-.ld-grain {
-  position: absolute; inset: -50%; z-index: 3; pointer-events: none; opacity: .07; mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: ldGrain .5s steps(4) infinite;
-}
-/* cinematic letterbox (dark theme) */
-.ld-bars { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-@media (max-width: 520px) { .ld-tag { font-size: 10px; letter-spacing: .32em; text-indent: .32em; } }
-.ld-bars span { position: absolute; left: 0; right: 0; height: 7.5vh; z-index: 4; background: #000; transition: transform .9s cubic-bezier(.7, 0, .2, 1); }
-.ld-bars span:first-child { top: 0; animation: ldBarTop .9s cubic-bezier(.2, .8, .2, 1) both; }
-.ld-bars span:last-child { bottom: 0; animation: ldBarBot .9s cubic-bezier(.2, .8, .2, 1) both; }
-:root[data-theme="light"] .ld-bars { display: none; }
+.ld-tag { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .55em; text-indent: .55em; color: var(--muted); white-space: nowrap; }
+.ld-tag span { display: inline-block; opacity: 0; transform: translateY(8px); filter: blur(5px); animation: ldLetter .8s cubic-bezier(.16, 1, .3, 1) forwards; }
+@media (max-width: 520px) { .ld-tag { font-size: 10px; letter-spacing: .34em; text-indent: .34em; } }
 
-/* exit: bars retract, logo lifts & dissolves, an iris opens onto the site */
-#loader.done { transition: --hole 1.05s cubic-bezier(.7, 0, .15, 1) .2s, visibility 0s 1.3s; --hole: 150vmax; visibility: hidden; pointer-events: none; }
-#loader.done .ld-stage { animation: ldStageOut .85s cubic-bezier(.7, 0, .2, 1) forwards; }
-#loader.done .ld-foot, #loader.done .ld-rays { transition: opacity .3s; opacity: 0; }
-#loader.done .ld-bars span:first-child { animation: none; transform: translateY(-100%); }
-#loader.done .ld-bars span:last-child { animation: none; transform: translateY(100%); }
-@supports not (mask: radial-gradient(circle, #000, #000)) { #loader.done { transition: opacity .8s, visibility 0s .8s; opacity: 0; } }
+/* quick version on reloads */
+#loader.quick .ld-logo { animation: ldQuick .6s cubic-bezier(.16, 1, .3, 1) both; --sr: 400%; --sx: 50%; }
+#loader.quick .ld-spot, #loader.quick .ld-tag { display: none; }
+#loader.quick .ld-shine { animation-delay: .3s; }
+
+/* exit — the background dissolves; the logo itself is flown into the hero by JS */
+#loader.done { background: transparent; transition: background .9s cubic-bezier(.4, 0, .2, 1); pointer-events: none; }
+#loader.done::before, #loader.done .ld-spot { transition: opacity .5s; opacity: 0; }
+#loader.done .ld-tag { transition: opacity .35s, transform .5s; opacity: 0; transform: translateY(10px); }
+#loader.done .ld-shine { animation: none; opacity: 0; }
 
 body.loading { overflow: hidden; }
 body.loading .hero > * { animation-play-state: paused !important; }
-.nav-wrap { transition: opacity .9s .25s var(--ease), transform .9s .25s var(--spring); }
+body.loading .hero-logo img { animation: none !important; opacity: 0; }
+.hero > .hero-logo { animation: none; } /* the intro logo lands here, so it must not shift */
+.nav-wrap { transition: opacity .9s .35s var(--ease), transform .9s .35s var(--spring); }
 body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 
-@keyframes ldWipe { to { clip-path: inset(0 0 0 0); } }
-@keyframes ldFocus { from { filter: blur(12px); transform: scale(.96); } to { filter: blur(0); transform: none; } }
-@keyframes ldEdge { 0% { left: 0; opacity: 0; } 12% { opacity: 1; } 85% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
-@keyframes ldGlitchR { 0% { opacity: .9; transform: translate(-9px, 1px); } 18% { transform: translate(6px, -2px); } 32% { transform: translate(-4px, 0); } 46% { transform: translate(3px, 1px); } 60% { transform: translate(-2px, 0); opacity: .7; } 74% { transform: translate(1px, 0); opacity: .45; } 88%, 100% { transform: none; opacity: 0; } }
-@keyframes ldGlitchC { 0% { opacity: .9; transform: translate(9px, -1px); } 18% { transform: translate(-6px, 2px); } 32% { transform: translate(4px, 0); } 46% { transform: translate(-3px, -1px); } 60% { transform: translate(2px, 0); opacity: .7; } 74% { transform: translate(-1px, 0); opacity: .45; } 88%, 100% { transform: none; opacity: 0; } }
+@keyframes ldSpot {
+  0% { --sx: -30%; --sr: 22%; }
+  62% { --sx: 118%; --sr: 30%; }
+  100% { --sx: 50%; --sr: 400%; }
+}
+@keyframes ldSpotLight { 0% { --sx: -30%; opacity: 0; } 15% { opacity: 1; } 62% { --sx: 118%; opacity: 1; } 100% { --sx: 50%; opacity: .55; } }
+@keyframes ldBloom { 0% { filter: brightness(1); } 18% { filter: brightness(1.9) saturate(1.2); } 100% { filter: brightness(1); } }
 @keyframes ldShine { 0% { opacity: 1; background-position: 130% 0; } 55%, 100% { opacity: 1; background-position: -30% 0; } }
-@keyframes ldReflect { to { opacity: .32; } }
+@keyframes ldGlint { 0% { opacity: 0; transform: scale(0) rotate(0deg); } 35% { opacity: 1; transform: scale(1) rotate(45deg); } 100% { opacity: 0; transform: scale(.2) rotate(120deg); } }
 @keyframes ldLetter { to { opacity: 1; transform: none; filter: blur(0); } }
-@keyframes ldAuraIn { to { opacity: .6; } }
-@keyframes ldRaysIn { to { opacity: .45; } }
-@keyframes ldSpin { to { rotate: 360deg; } }
-@keyframes ldFootIn { from { opacity: 0; transform: translateY(10px); } }
-@keyframes ldGrain { 0% { transform: translate(0, 0); } 25% { transform: translate(-3%, 2%); } 50% { transform: translate(2%, -3%); } 75% { transform: translate(-2%, -1%); } 100% { transform: translate(1%, 3%); } }
-@keyframes ldBarTop { from { transform: translateY(-100%); } }
-@keyframes ldBarBot { from { transform: translateY(100%); } }
-@keyframes ldStageOut { 0% { transform: none; filter: blur(0); opacity: 1; } 100% { transform: scale(1.5) translateZ(80px); filter: blur(16px); opacity: 0; } }
+@keyframes ldFade { to { opacity: 1; } }
+@keyframes ldQuick { from { opacity: 0; transform: scale(.96); filter: blur(10px); } }
 @keyframes ldFailsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
 @media (prefers-reduced-motion: reduce) {
-  #ldFx, .ld-r, .ld-c, .ld-edge, .ld-aura, .ld-rays, .ld-grain, .ld-bars { display: none; }
-  .ld-main { clip-path: none; animation: none; }
-  .ld-reflect { animation: none; opacity: .3; }
+  .ld-logo { animation: none; -webkit-mask: none; mask: none; }
+  .ld-spot, .ld-glints, .ld-shine { display: none; }
   .ld-tag span { animation: none; opacity: 1; transform: none; filter: none; }
-  #loader.done { transition: opacity .4s, visibility 0s .4s; opacity: 0; }
 }

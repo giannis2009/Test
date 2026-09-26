@@ -11,169 +11,85 @@
   const params = new URLSearchParams(location.search);
 
   const site_logo = () => S.site?.appearance?.logoUrl || '/assets/logo.webp';
-  /* ---------- loading screen: logo built from particles, counter, iris exit ---------- */
+  /* ---------- loading screen: spotlight reveal, then the logo flies into the hero ---------- */
   const loadStart = performance.now();
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let seenIntro = false; try { seenIntro = sessionStorage.getItem('ezro-intro') === '1'; } catch { /* */ }
-  const MIN_INTRO = seenIntro ? 1100 : 3400; // full show once per visit, short on reloads
-  const TAKEOVER = seenIntro ? 0.25 : 1.35;  // seconds until the real logo wipes in (matches CSS --d)
-  let target = 6; let shown = 0; let fx = null;
+  const MIN_INTRO = reduceMotion ? 400 : seenIntro ? 700 : 2900; // full show once per visit, quick on reloads
   if (seenIntro) $('#loader')?.classList.add('quick');
-  // tagline letters appear one by one, after the logo lands
+  // tagline letters rise in one by one after the reveal
   (() => {
     const tag = $('#ldTag');
-    if (!tag) return;
+    if (!tag || seenIntro) return;
     tag.replaceChildren(...[...tag.textContent].map((ch, i) => {
       const sp = document.createElement('span');
       sp.textContent = ch === ' ' ? ' ' : ch;
-      sp.style.animationDelay = `${TAKEOVER + 0.55 + i * 0.035}s`;
+      sp.style.animationDelay = `${1.95 + i * 0.03}s`;
       return sp;
     }));
   })();
-  // counter + bar follow real progress but never finish before the intro has played
-  const setProgress = (p) => { target = Math.max(target, p); };
-  (function tick() {
-    const loader = $('#loader');
-    if (!loader) return;
-    const goal = Math.min(target, Math.min(100, ((performance.now() - loadStart) / MIN_INTRO) * 100));
-    shown += (goal - shown) * 0.1;
-    const v = Math.round(shown);
-    const c = $('#ldCount'); if (c) c.textContent = String(v).padStart(3, '0');
-    const bar = $('#ldBar'); if (bar) bar.style.width = `${shown}%`;
-    loader.setAttribute('aria-valuenow', String(v));
-    if (!loader.classList.contains('done')) requestAnimationFrame(tick);
+  // glints: tiny stars that sparkle on the letters when the light blooms
+  (() => {
+    const box = $('#ldGlints');
+    if (!box || reduceMotion || seenIntro) return;
+    const spots = [[9, 38], [24, 70], [36, 22], [47, 60], [58, 30], [70, 72], [83, 26], [92, 55]];
+    spots.forEach(([x, y], i) => {
+      const g = document.createElement('i');
+      g.style.left = `${x}%`; g.style.top = `${y}%`;
+      g.style.animationDelay = `${1.75 + i * 0.09 + Math.random() * 0.1}s`;
+      g.style.scale = String(0.6 + Math.random() * 0.8);
+      box.append(g);
+    });
   })();
-  // subtle 3D tilt of the logo toward the pointer
+  // slight 3D tilt toward the pointer while waiting
   (() => {
     const loader = $('#loader'); const stage = $('.ld-stage');
     if (!loader || !stage || reduceMotion || !matchMedia('(pointer: fine)').matches) return;
+    loader.style.perspective = '1000px';
     loader.addEventListener('pointermove', (e) => {
+      if (loader.classList.contains('done')) return;
       const x = e.clientX / innerWidth - 0.5; const y = e.clientY / innerHeight - 0.5;
-      stage.style.transform = `rotateX(${(-y * 9).toFixed(2)}deg) rotateY(${(x * 12).toFixed(2)}deg)`;
+      stage.style.transition = 'transform .6s cubic-bezier(.2,.8,.2,1)';
+      stage.style.transform = `rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 10).toFixed(2)}deg)`;
     });
   })();
-  // Particles: thousands of sparks fly in and assemble into the exact shape of the logo,
-  // hand over to the real logo, orbit as ambient dust and explode outward on exit.
-  (async function particles() {
-    const cv = $('#ldFx'); const logoBox = $('.ld-logo'); const src = $('#ldImg');
-    if (!cv || !logoBox || !src || reduceMotion) return;
-    const ctx = cv.getContext('2d');
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    let W = 0; let H = 0;
-    const size = () => { W = cv.width = innerWidth * dpr; H = cv.height = innerHeight * dpr; };
-    size(); addEventListener('resize', size);
-    const light = document.documentElement.dataset.theme === 'light';
-    const css = getComputedStyle(document.documentElement);
-    const brand = css.getPropertyValue('--brand').trim() || '#905abd';
-    const brand2 = css.getPropertyValue('--brand-2').trim() || '#b491dc';
-    const small = innerWidth < 700;
 
-    // ambient dust
-    const dust = Array.from({ length: small ? 40 : 80 }, () => {
-      const a = Math.random() * Math.PI * 2;
-      return { a, r: (0.6 + Math.random() * 0.8) * Math.max(innerWidth, innerHeight) * dpr, tr: (80 + Math.random() * 300) * dpr,
-        s: (0.5 + Math.random() * 1.8) * dpr, w: (Math.random() < 0.5 ? 1 : -1) * (0.0015 + Math.random() * 0.005),
-        c: [brand, brand2, light ? '#7a3fb0' : '#ffffff'][(Math.random() * 3) | 0], o: 0, vr: 0 };
-    });
-
-    // sample the logo's pixels to get the particle targets
-    let sparks = [];
-    if (!seenIntro) {
-      try {
-        const img = new Image(); img.src = src.currentSrc || src.src; await img.decode();
-        const r = logoBox.getBoundingClientRect();
-        const w = Math.max(1, Math.round(r.width)); const h = Math.max(1, Math.round(r.height));
-        const off = document.createElement('canvas'); off.width = w; off.height = h;
-        const octx = off.getContext('2d', { willReadFrequently: true });
-        const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
-        const dw = img.naturalWidth * scale; const dh = img.naturalHeight * scale;
-        octx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-        const data = octx.getImageData(0, 0, w, h).data;
-        let step = small ? 4 : 3; const cap = small ? 1300 : 2600;
-        let pts = [];
-        do {
-          pts = [];
-          for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) {
-            const i = (y * w + x) * 4;
-            if (data[i + 3] > 140) pts.push([x, y, data[i], data[i + 1], data[i + 2]]);
-          }
-          step += 1;
-        } while (pts.length > cap);
-        const cx = innerWidth / 2; const cy = innerHeight * 0.44;
-        sparks = pts.map(([x, y, R, G, B]) => {
-          const ang = Math.random() * Math.PI * 2; const dist = (0.5 + Math.random() * 0.7) * Math.max(innerWidth, innerHeight);
-          const lift = (v) => Math.min(255, v + 40);
-          return {
-            sx: (cx + Math.cos(ang) * dist) * dpr, sy: (cy + Math.sin(ang) * dist * 0.7) * dpr,
-            tx: (r.left + x) * dpr, ty: (r.top + y) * dpr, x: 0, y: 0,
-            d: Math.random() * 0.45 + (x / w) * 0.25, dur: 0.75 + Math.random() * 0.45,
-            c: `rgb(${lift(R)},${lift(G)},${lift(B)})`, s: (0.9 + Math.random() * 0.9) * dpr, vx: 0, vy: 0, o: 1,
-          };
-        });
-      } catch { sparks = []; }
-    }
-
-    const ease = (t) => 1 - Math.pow(1 - t, 4);
-    let mode = 'in'; let alive = true; const t0 = performance.now(); let tOut = 0;
-    fx = {
-      burst() {
-        mode = 'out'; tOut = performance.now();
-        const cx = W / 2; const cy = H * 0.44;
-        for (const p of sparks) { const dx = p.x - cx; const dy = p.y - cy; const m = Math.hypot(dx, dy) || 1; const sp = (6 + Math.random() * 16) * dpr; p.vx = (dx / m) * sp; p.vy = (dy / m) * sp; }
-        dust.forEach((p) => { p.vr = (8 + Math.random() * 22) * dpr; });
-      },
-      stop() { alive = false; },
-    };
-    (function frame(now) {
-      if (!alive) return;
-      const t = (now - t0) / 1000;
-      const cx = W / 2; const cy = H * 0.44;
-      ctx.clearRect(0, 0, W, H);
-      ctx.globalCompositeOperation = light ? 'source-over' : 'lighter';
-      // dust
-      for (const p of dust) {
-        if (mode === 'in') { p.r += (p.tr - p.r) * 0.03; p.o = Math.min(1, p.o + 0.02); } else { p.r += p.vr; p.vr *= 1.04; p.o = Math.max(0, p.o - 0.025); }
-        p.a += p.w;
-        const x = cx + Math.cos(p.a) * p.r; const y = cy + Math.sin(p.a) * p.r * 0.62;
-        ctx.globalAlpha = p.o * 0.6; ctx.fillStyle = p.c;
-        ctx.beginPath(); ctx.arc(x, y, p.s, 0, Math.PI * 2); ctx.fill();
-      }
-      // sparks that build the logo
-      for (const p of sparks) {
-        if (mode === 'in') {
-          const k = ease(Math.min(1, Math.max(0, (t - p.d) / p.dur)));
-          p.x = p.sx + (p.tx - p.sx) * k; p.y = p.sy + (p.ty - p.sy) * k;
-          // once the real logo takes over, the sparks settle into a faint shimmer
-          const fade = t > TAKEOVER + 0.3 ? Math.max(0.08, 1 - (t - TAKEOVER - 0.3) * 1.4) : 1;
-          p.o = fade * (0.75 + Math.sin(now / 90 + p.tx) * 0.25) * (k > 0 ? 1 : 0);
-          if (k < 1) { // light trail while flying
-            ctx.globalAlpha = p.o * 0.25; ctx.fillStyle = p.c;
-            const tx = p.x - (p.tx - p.sx) * 0.02; const ty = p.y - (p.ty - p.sy) * 0.02;
-            ctx.fillRect(tx, ty, p.s, p.s);
-          }
-        } else {
-          p.x += p.vx; p.y += p.vy; p.vx *= 1.05; p.vy *= 1.05; p.o = Math.max(0, (p.o || 0.5) - 0.03);
-        }
-        ctx.globalAlpha = p.o; ctx.fillStyle = p.c;
-        ctx.fillRect(p.x, p.y, p.s, p.s);
-      }
-      if (mode === 'out' && now - tOut > 1400) { alive = false; ctx.clearRect(0, 0, W, H); return; }
-      requestAnimationFrame(frame);
-    })(performance.now());
-  })();
   async function hideLoader() {
     const loader = $('#loader');
     if (!loader) return;
-    setProgress(100);
     try { sessionStorage.setItem('ezro-intro', '1'); } catch { /* */ }
-    await $('#heroLogo')?.decode?.().catch(() => {});
-    const wait = Math.max(0, MIN_INTRO - (performance.now() - loadStart)) + 400; // let the counter land on 100
+    const hero = $('#heroLogo');
+    await hero?.decode?.().catch(() => {});
+    const wait = Math.max(0, MIN_INTRO - (performance.now() - loadStart));
     setTimeout(() => {
+      const stage = $('.ld-stage'); const logo = $('#ldLogo');
+      stage.style.transition = 'none'; stage.style.transform = 'none';
+      const from = logo.getBoundingClientRect();
+      const to = hero?.getBoundingClientRect();
+      const onScreen = to && to.width > 0 && to.bottom > 0 && to.top < innerHeight && location.pathname === '/';
       loader.classList.add('done');
       loader.setAttribute('aria-busy', 'false');
-      fx?.burst();
-      document.body.classList.remove('loading'); // the site animates in through the opening iris
-      setTimeout(() => { fx?.stop(); loader.remove(); }, 1600);
+      if (hero) { hero.style.animation = 'none'; hero.style.opacity = '0'; }
+      // the page appears around the logo once it is well on its way
+      setTimeout(() => document.body.classList.remove('loading'), onScreen && !reduceMotion ? 520 : 0);
+      const finish = () => {
+        if (hero) { hero.style.opacity = ''; hero.style.animation = 'bob 7s ease-in-out infinite'; }
+        loader.remove();
+      };
+      if (!onScreen || reduceMotion) {
+        loader.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: 'ease-out', fill: 'forwards' }).onfinish = finish;
+        return;
+      }
+      // FLIP: fly the loader logo exactly onto the hero logo, then swap them invisibly
+      const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+      const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+      const sc = to.width / from.width;
+      logo.style.animation = 'none'; logo.style.webkitMask = 'none'; logo.style.mask = 'none';
+      logo.animate([
+        { transform: 'translate(0, 0) scale(1)' },
+        { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 18}px) scale(${1 + (sc - 1) * 0.5 + 0.03})`, offset: 0.55 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${sc})` },
+      ], { duration: 1050, easing: 'cubic-bezier(.65, 0, .25, 1)', fill: 'forwards' }).onfinish = finish;
     }, wait);
   }
 
@@ -183,10 +99,9 @@
       const [site, prod, media] = await Promise.all([api('/api/public/site'), api('/api/public/products'), api('/api/public/media')]);
       S.site = site; S.products = prod.products; S.media = media.media; S.albums = media.albums || [];
     } catch (e) { fail(e); hideLoader(); return; }
-    setProgress(70);
     // use the logo chosen in Admin → Appearance for the loader too
     const logo = site_logo();
-    if (logo && $('#ldImg') && !$('#ldImg').src.endsWith(logo)) { $$('.ld-img').forEach((i) => { i.src = logo; }); $('.ld-shine')?.style.setProperty('--ld-mask', `url("${logo}")`); }
+    if (logo && $('#ldImg') && !$('#ldImg').src.endsWith(logo)) { $('#ldImg').src = logo; $('.ld-shine')?.style.setProperty('--ld-mask', `url("${logo}")`); }
     E.setCurrency(S.site.checkout.currency);
     E.setTexts(S.site.texts);
     E.applyAppearance(S.site.appearance);

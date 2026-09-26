@@ -14,27 +14,16 @@
   <link rel="stylesheet" href="/css/site.css">
 </head>
 <body class="loading">
-  <div id="loader" role="progressbar" aria-label="Loading" aria-busy="true" aria-valuemin="0" aria-valuemax="100">
-    <div class="ld-rays" aria-hidden="true"></div>
-    <div class="ld-aura" aria-hidden="true"></div>
-    <canvas id="ldFx" aria-hidden="true"></canvas>
+  <div id="loader" role="status" aria-label="Loading" aria-busy="true">
+    <div class="ld-spot" aria-hidden="true"></div>
     <div class="ld-stage">
-      <div class="ld-logo">
-        <img src="/assets/logo.webp" alt="" class="ld-img ld-r" aria-hidden="true">
-        <img src="/assets/logo.webp" alt="" class="ld-img ld-c" aria-hidden="true">
-        <img src="/assets/logo.webp" alt="" class="ld-img ld-main" id="ldImg">
-        <span class="ld-shine"></span>
-        <span class="ld-edge"></span>
+      <div class="ld-logo" id="ldLogo">
+        <img src="/assets/logo.webp" alt="" class="ld-img" id="ldImg">
+        <span class="ld-shine" aria-hidden="true"></span>
+        <span class="ld-glints" id="ldGlints" aria-hidden="true"></span>
       </div>
-      <div class="ld-reflect" aria-hidden="true"><img src="/assets/logo.webp" alt="" class="ld-img"></div>
       <p class="ld-tag" id="ldTag">VFX &amp; CREATIVE STUDIO</p>
     </div>
-    <div class="ld-foot" aria-hidden="true">
-      <span class="ld-count" id="ldCount">000</span>
-      <div class="ld-bar"><span id="ldBar"></span></div>
-    </div>
-    <div class="ld-grain" aria-hidden="true"></div>
-    <div class="ld-bars" aria-hidden="true"><span></span><span></span></div>
   </div>
   <div class="bg-fx" aria-hidden="true"><span class="orb a"></span><span class="orb b"></span><span class="grid"></span></div>
 
