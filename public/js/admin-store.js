@@ -148,7 +148,7 @@
         if (!(await E.confirmDialog(`Delete “${p.title}”?`, 'Existing buyers keep their keys, but the video will no longer play.', { ok: 'Delete', danger: true }))) return;
         await api(`/api/admin/products/${p.id}`, { method: 'DELETE' }).then(() => { toast('Product deleted'); s.close(); A.refresh(); }).catch(fail);
       }, 'danger'));
-      foot.push(h('a', { class: 'btn', href: `/#shop/${encodeURIComponent(p.slug)}`, target: '_blank' }, iconEl('external'), 'View'));
+      foot.push(h('a', { class: 'btn', href: `/product/${encodeURIComponent(p.slug)}`, target: '_blank' }, iconEl('external'), 'View'));
     }
     foot.push(h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => s.close() }, 'Cancel'), save);
 

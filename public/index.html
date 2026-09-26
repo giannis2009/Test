@@ -18,17 +18,14 @@
 
   <header class="nav-wrap">
     <nav class="nav glass" aria-label="Main">
-      <a href="#top" class="nav-brand" aria-label="Home"><img src="/assets/favicon.png" alt="" width="26" height="26" id="navIcon"><span id="navName">Ezro</span></a>
-      <div class="nav-links">
-        <a href="#work">Work</a>
-        <a href="#shop">Shop</a>
-        <a href="/watch">Watch</a>
-      </div>
+      <div class="nav-side" aria-hidden="true"></div>
+      <div class="nav-cats" id="navCats"></div>
       <div class="nav-actions" id="navActions"></div>
     </nav>
   </header>
 
   <main id="top">
+   <div id="homeView">
     <section class="hero">
       <h1 class="hero-logo"><img id="heroLogo" src="/assets/logo.webp" alt="Ezro" width="1954" height="692"></h1>
       <p class="hero-handle grad-text" id="heroHandle">@ezrovfx</p>
@@ -46,9 +43,8 @@
       <div class="section-head">
         <div>
           <p class="eyebrow">Portfolio</p>
-          <h2>Selected work</h2>
+          <h2>Selected work <span class="sec-label" id="workLabel"></span></h2>
         </div>
-        <div id="workFilter"></div>
       </div>
       <div class="gallery" id="gallery"></div>
     </section>
@@ -57,10 +53,9 @@
       <div class="section-head">
         <div>
           <p class="eyebrow">Store</p>
-          <h2 id="shopTitle">Shop</h2>
+          <h2><span id="shopTitle">Shop</span> <span class="sec-label" id="shopLabel"></span></h2>
           <p class="muted section-sub" id="shopSub"></p>
         </div>
-        <div id="shopFilter"></div>
       </div>
       <div class="products" id="products"></div>
     </section>
@@ -72,6 +67,8 @@
         <div class="promise-item"><span class="promise-ic" data-ic="invoice"></span><div><h4>Detailed invoice</h4><p class="muted">Sent to your email right after payment.</p></div></div>
       </div>
     </section>
+   </div>
+   <div id="productView" class="hidden"></div>
   </main>
 
   <footer class="footer">

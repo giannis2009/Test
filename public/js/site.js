@@ -21,7 +21,7 @@
     E.applyAppearance(S.site.appearance);
     // drop cart items that no longer exist / aren't buyable
     S.cart = S.cart.filter((id) => S.products.some((p) => p.id === id && p.status === 'active' && !p.soldOut));
-    renderHero(); renderWork(); renderShop(); renderNav();
+    renderHero(); buildNavCats(); renderWork(); renderShop(); renderNav();
     $('#year').textContent = new Date().getFullYear();
     $$('[data-ic]').forEach((el) => el.replaceChildren(iconEl(el.dataset.ic)));
     E.watchTexts('home');
@@ -29,14 +29,20 @@
     if (params.get('edit') === '1') {
       if (auth.user?.isAdmin) E.textEditMode('home'); else toast('Sign in as an admin to edit texts', 'error');
     } else if (window.top === window) E.track('/');
-    openFromHash();
+    const legacy = location.hash.match(/^#shop\/(.+)$/); // old links: /#shop/slug
+    if (legacy) history.replaceState({}, '', `/product/${legacy[1]}`);
+    route();
+    heroScroll();
   }
   auth.onChange(() => renderNav());
-  window.addEventListener('hashchange', openFromHash);
-  function openFromHash() {
-    const m = location.hash.match(/^#shop\/(.+)$/);
-    if (m) { const p = S.products.find((x) => x.slug === decodeURIComponent(m[1])); if (p) openProduct(p); }
-  }
+  // in-page links (#work, #shop) also work from a product page
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || location.pathname === '/' || a.getAttribute('href') === '#') return;
+    e.preventDefault();
+    navigate('/');
+    setTimeout(() => $(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' }), 120);
+  });
 
   /* ---------- nav ---------- */
   function renderNav() {
@@ -58,7 +64,55 @@
     } else {
       acc = h('button', { class: 'btn sm primary', onclick: () => E.signInSheet('Sign in') }, 'Sign in');
     }
-    box.replaceChildren(E.themeButton(), cartBtn, acc);
+    const watch = h('a', { class: 'btn icon ghost', href: '/watch', 'aria-label': 'Video Review', title: 'Video Review', html: icon('play') });
+    box.replaceChildren(E.themeButton(), watch, cartBtn, acc);
+  }
+
+  /* ---------- centred category navigation ---------- */
+  let navSeg = null;
+  function buildNavCats() {
+    const cats = S.site.categories.filter((c) => S.media.some((m) => m.category_id === c.id) || S.products.some((p) => p.category_id === c.id));
+    navSeg = segmented([['all', 'All'], ...cats.map((c) => [String(c.id), c.name])], cat, (v) => {
+      if (location.pathname !== '/') navigate('/');
+      setCategory(String(v), true);
+    }, { cls: 'nav-seg' });
+    $('#navCats').replaceChildren(navSeg);
+    // the nav becomes a little more solid once the page scrolls
+    const nav = $('.nav');
+    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 12);
+    window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  }
+
+  /* ---------- Apple-style motion ---------- */
+  // Hero logo gently shrinks, blurs and fades as you scroll past it.
+  function heroScroll() {
+    const hero = $('.hero'); const logo = $('.hero-logo');
+    if (!hero || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      if ($('#homeView').classList.contains('hidden')) return;
+      const t = Math.min(1, Math.max(0, window.scrollY / (hero.offsetHeight * 0.9)));
+      logo.style.transform = `translateY(${t * 60}px) scale(${1 - t * 0.18})`;
+      logo.style.opacity = String(1 - t * 0.85);
+      logo.style.filter = `blur(${t * 6}px)`;
+      hero.style.setProperty('--hero-t', t);
+    };
+    window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
+  }
+  // Apple TV-style tilt with a soft light reflection (mouse / trackpad only).
+  function tilt(el) {
+    if (!matchMedia('(hover: hover) and (pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const glare = h('span', { class: 'glare' });
+    el.append(glare);
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5; const y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(900px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateY(-6px)`;
+      glare.style.background = `radial-gradient(circle at ${(x + 0.5) * 100}% ${(y + 0.5) * 100}%, rgba(255,255,255,.22), transparent 55%)`;
+    });
+    el.addEventListener('pointerleave', () => { el.style.transform = ''; glare.style.background = ''; });
   }
 
   /* ---------- hero ---------- */
@@ -68,8 +122,6 @@
     $('#heroLogo').src = appearance.logoUrl || '/assets/logo.webp';
     $('#heroLogo').alt = site.name;
     $('#footerLogo').src = appearance.logoUrl || '/assets/logo.webp';
-    $('#navIcon').src = appearance.faviconUrl || '/assets/favicon.png';
-    $('#navName').textContent = site.name;
     $('#heroHandle').textContent = site.handle;
     $('#heroTagline').textContent = site.tagline;
     $('#heroBio').textContent = site.bio;
@@ -87,17 +139,27 @@
   }
 
   /* ---------- work / gallery ---------- */
-  let workCat = 'all';
+  let cat = 'all';
+  // One category filter drives the nav, the portfolio and the shop.
+  function setCategory(id, scroll) {
+    cat = String(id);
+    navSeg?.set(cat);
+    renderGallery(); renderProducts();
+    const c = S.site.categories.find((x) => String(x.id) === cat);
+    $('#workLabel').textContent = c ? c.name : '';
+    $('#shopLabel').textContent = c ? c.name : '';
+    if (scroll) {
+      const hasWork = S.media.some((m) => cat === 'all' || String(m.category_id) === cat);
+      const target = hasWork ? $('#work') : $('#shop');
+      setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), location.pathname === '/' ? 0 : 60);
+    }
+  }
   function renderWork() {
-    const cats = S.site.categories.filter((c) => S.media.some((m) => m.category_id === c.id));
-    const filter = $('#workFilter');
-    filter.replaceChildren();
-    if (cats.length) filter.append(segmented([['all', 'All'], ...cats.map((c) => [String(c.id), c.name])], workCat, (v) => { workCat = String(v); renderGallery(); }));
     renderGallery();
   }
   function renderGallery() {
     const g = $('#gallery');
-    const items = S.media.filter((m) => workCat === 'all' || String(m.category_id) === workCat);
+    const items = S.media.filter((m) => cat === 'all' || String(m.category_id) === cat);
     if (!items.length) { g.replaceChildren(h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.')); return; }
     g.replaceChildren(...items.map((m, i) => {
       const media = m.type === 'video'
@@ -108,6 +170,7 @@
         m.title ? h('figcaption', { class: 'tile-cap' }, m.title) : null);
       if (m.type === 'video') { tile.onmouseenter = () => media.play().catch(() => {}); tile.onmouseleave = () => media.pause(); }
       tile.onclick = () => lightbox(items, i);
+      tilt(tile);
       tile.onkeydown = (e) => e.key === 'Enter' && lightbox(items, i);
       return E.reveal(tile, (i % 6) * 60);
     }));
@@ -136,22 +199,17 @@
   }
 
   /* ---------- shop ---------- */
-  let shopCat = 'all';
   function renderShop() {
     const shop = S.site.shop;
     $('#shopTitle').textContent = shop.title;
     $('#shopSub').textContent = shop.subtitle;
-    const cats = S.site.categories.filter((c) => S.products.some((p) => p.category_id === c.id));
-    const filter = $('#shopFilter');
-    filter.replaceChildren();
-    if (cats.length > 1) filter.append(segmented([['all', 'All'], ...cats.map((c) => [String(c.id), c.name])], shopCat, (v) => { shopCat = String(v); renderProducts(); }));
     renderProducts();
   }
   const soonTimers = [];
   function renderProducts() {
     soonTimers.splice(0).forEach(clearInterval);
     const grid = $('#products');
-    const list = S.products.filter((p) => shopCat === 'all' || String(p.category_id) === shopCat);
+    const list = S.products.filter((p) => cat === 'all' || String(p.category_id) === cat);
     if (!list.length) { grid.replaceChildren(h('div', { class: 'empty', style: { gridColumn: '1/-1' } }, iconEl('bag'), 'Products are on the way.')); return; }
     grid.replaceChildren(...list.map((p, i) => E.reveal(productCard(p), (i % 4) * 70)));
   }
@@ -185,7 +243,8 @@
         p.subtitle ? h('div', { class: 'p-sub' }, p.subtitle) : null,
         h('div', { class: 'p-foot' }, soon ? h('span', { class: 'chip brand' }, iconEl('bell'), 'Notify me') : priceEl(p),
           !soon && !p.soldOut ? h('button', { class: 'btn icon sm primary', 'aria-label': `Add ${p.title} to cart`, html: icon('plus'), onclick: (e) => { e.stopPropagation(); addToCart(p, e.currentTarget); } }) : null)));
-    card.onclick = () => { history.replaceState(null, '', `#shop/${encodeURIComponent(p.slug)}`); openProduct(p); };
+    card.onclick = () => openProduct(p, card.querySelector('.p-media img'));
+    tilt(card);
     card.onkeydown = (e) => e.key === 'Enter' && card.click();
     return card;
   }
@@ -204,7 +263,7 @@
     }
   }
 
-  /* ---------- product sheet ---------- */
+  /* ---------- product page (/product/:slug) with auto-advancing slideshow ---------- */
   function embedUrl(u) {
     if (!u) return null;
     let m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([\w-]{6,})/);
@@ -213,46 +272,177 @@
     if (m) return `https://player.vimeo.com/video/${m[1]}`;
     return null;
   }
-  function openProduct(p) {
-    const soon = p.status === 'coming_soon';
-    const slides = [];
+  let pageCleanup = null;
+  function slideshow(p) {
+    const items = [];
+    for (const src of [p.cover_url, ...(p.gallery || [])].filter(Boolean)) items.push({ type: /\.(mp4|webm|mov)$/i.test(src) ? 'video' : 'img', src });
     const emb = embedUrl(p.preview_url);
-    if (emb) slides.push(h('iframe', { src: emb, allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: true, title: `${p.title} preview` }));
-    else if (p.preview_url) slides.push(h('video', { src: p.preview_url, controls: true, playsinline: true, poster: p.cover_url || null, controlslist: 'nodownload' }));
-    for (const src of [p.cover_url, ...(p.gallery || [])].filter(Boolean)) slides.push(h('img', { src, alt: '' }));
-    const gal = slides.length ? h('div', { class: 'pv-gallery' }, slides) : null;
-    const dots = slides.length > 1 ? h('div', { class: 'pv-dots' }, slides.map((_, i) => h('span', { class: i ? '' : 'on' }))) : null;
-    if (gal && dots) gal.addEventListener('scroll', E.debounce(() => { const i = Math.round(gal.scrollLeft / gal.clientWidth); $$('span', dots).forEach((d, j) => d.classList.toggle('on', i === j)); }, 40));
+    if (emb) items.push({ type: 'embed', src: emb });
+    else if (p.preview_url) items.push({ type: 'video', src: p.preview_url, controls: true });
+    if (!items.length) return { el: h('div', { class: 'ss ss-empty', html: icon('box') }), stop() {} };
 
-    const cat = S.site.categories.find((c) => c.id === p.category_id);
-    const body = [
-      gal, dots,
-      h('div', { class: 'pv-head' },
-        h('div', {}, cat ? h('p', { class: 'eyebrow' }, cat.name) : null, h('h2', {}, p.title), p.subtitle ? h('p', { class: 'muted' }, p.subtitle) : null),
-        soon ? null : priceEl(p)),
-      soon && p.release_at && p.release_at > Date.now() ? h('div', { style: { margin: '6px 0 14px' } }, h('p', { class: 'label', style: { marginBottom: '8px' } }, 'Launches in'), (() => { const c = countdown(p.release_at); c.style.color = 'var(--text)'; $$('div', c).forEach((d) => { d.style.background = 'var(--surface-2)'; }); return c; })()) : null,
-      p.description ? h('p', { class: 'pv-desc' }, p.description) : null,
-      p.features?.length ? h('ul', { class: 'features' }, p.features.map((f) => h('li', {}, iconEl('check'), h('span', {}, f)))) : null,
-      p.deliver_note ? h('div', { class: 'secure-note' }, iconEl('gift'), h('div', {}, h('strong', {}, 'What you get'), h('div', {}, p.deliver_note))) : null,
-      p.hasVideo ? h('div', { class: 'secure-note' }, iconEl('shield'), h('div', {}, h('strong', {}, 'Private streaming'), h('div', {}, 'After payment you get a personal key. Watch it in your private Video Review page — the key only works with your Google account.'))) : null,
-      p.tags?.length ? h('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '14px' } }, p.tags.map((t) => h('span', { class: 'chip' }, `#${t}`))) : null,
-    ];
-    let foot;
+    const DUR = 5000;
+    let i = 0; let timer = null; let started = 0; let paused = false; let left = DUR;
+    const slides = items.map((it, n) => {
+      const media = it.type === 'embed' ? h('iframe', { src: n === 0 ? it.src : 'about:blank', 'data-src': it.src, allow: 'autoplay; encrypted-media; picture-in-picture', allowfullscreen: true, title: `${p.title} preview` })
+        : it.type === 'video' ? h('video', { src: it.src, muted: !it.controls, loop: true, playsinline: true, controls: !!it.controls, controlslist: 'nodownload', poster: p.cover_url || null })
+          : h('img', { src: it.src, alt: `${p.title} ${n + 1}` });
+      return h('div', { class: `ss-slide ${n === 0 ? 'on' : ''}`, dataset: { type: it.type } }, media);
+    });
+    if (slides[0].firstChild.tagName === 'IMG') slides[0].firstChild.style.viewTransitionName = 'product-hero';
+    const bars = items.length > 1 ? h('div', { class: 'ss-bars' }, items.map((_, n) => h('button', { type: 'button', 'aria-label': `Slide ${n + 1}`, onclick: () => go(n) }, h('span')))) : null;
+    const prev = h('button', { class: 'ss-btn prev', 'aria-label': 'Previous', html: icon('chevron-left'), onclick: () => go(i - 1) });
+    const next = h('button', { class: 'ss-btn next', 'aria-label': 'Next', html: icon('chevron-right'), onclick: () => go(i + 1) });
+    const counter = h('span', { class: 'ss-count' });
+    const stage = h('div', { class: 'ss-stage' }, slides);
+    const thumbs = items.length > 1 ? h('div', { class: 'ss-thumbs' }, items.map((it, n) => h('button', { type: 'button', class: n === 0 ? 'on' : '', 'aria-label': `Show slide ${n + 1}`, onclick: () => go(n) },
+      it.type === 'img' ? h('img', { src: it.src, alt: '' }) : h('span', { html: icon('play') })))) : null;
+    const el = h('div', { class: 'ss' }, h('div', { class: 'ss-frame' }, stage, bars, items.length > 1 ? [prev, next, counter] : null), thumbs);
+
+    function setBars() {
+      if (!bars) return;
+      [...bars.children].forEach((b, n) => {
+        const f = b.firstChild;
+        f.style.transition = 'none';
+        f.style.width = n < i ? '100%' : '0%';
+        if (n === i && !paused && isAuto()) { f.offsetWidth; f.style.transition = `width ${left}ms linear`; f.style.width = '100%'; }
+        else if (n === i) f.style.width = `${(1 - left / DUR) * 100}%`;
+      });
+    }
+    const isAuto = () => items[i].type === 'img';
+    function schedule() {
+      clearTimeout(timer);
+      if (items.length < 2 || paused || !isAuto()) { setBars(); return; }
+      started = Date.now();
+      timer = setTimeout(() => go(i + 1), left);
+      setBars();
+    }
+    function go(n) {
+      const to = (n + items.length) % items.length;
+      if (to === i) return;
+      const dir = n > i ? 1 : -1;
+      const from = slides[i]; const target = slides[to];
+      from.classList.remove('on'); from.classList.toggle('out-left', dir > 0); from.classList.toggle('out-right', dir < 0);
+      target.classList.remove('out-left', 'out-right'); target.style.setProperty('--dir', dir); target.classList.add('on');
+      from.querySelector('video')?.pause();
+      const ifr = target.querySelector('iframe'); if (ifr && ifr.src === 'about:blank') ifr.src = ifr.dataset.src;
+      const v = target.querySelector('video'); if (v && v.muted) v.play().catch(() => {});
+      i = to; left = DUR;
+      counter.textContent = `${i + 1} / ${items.length}`;
+      thumbs && [...thumbs.children].forEach((t, k) => t.classList.toggle('on', k === i));
+      thumbs?.children[i].scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      schedule();
+    }
+    counter.textContent = `1 / ${items.length}`;
+    const pause = () => { if (paused) return; paused = true; left = Math.max(300, left - (Date.now() - started)); clearTimeout(timer); setBars(); };
+    const resume = () => { if (!paused) return; paused = false; schedule(); };
+    el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') pause(); });
+    el.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') resume(); });
+    const onVis = () => (document.hidden ? pause() : resume());
+    document.addEventListener('visibilitychange', onVis);
+    const onKey = (e) => { if (e.target.closest?.('input, textarea')) return; if (e.key === 'ArrowRight') go(i + 1); if (e.key === 'ArrowLeft') go(i - 1); };
+    document.addEventListener('keydown', onKey);
+    // swipe
+    let sx = null;
+    stage.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener('touchend', (e) => { if (sx == null) return; const d = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(d) > 40) go(i + (d < 0 ? 1 : -1)); });
+    requestAnimationFrame(schedule);
+    return { el, stop() { clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); document.removeEventListener('keydown', onKey); } };
+  }
+
+  function buyBox(p) {
+    const soon = p.status === 'coming_soon';
+    const off = p.compare_cents > p.price_cents ? Math.round((1 - p.price_cents / p.compare_cents) * 100) : 0;
+    const box = h('aside', { class: 'buybox glass' });
+    const kids = [];
     if (soon) {
-      const nb = h('button', { class: 'btn primary lg block' }, iconEl('bell'), 'Notify me when it launches');
+      kids.push(h('span', { class: 'chip brand' }, iconEl('clock'), 'Coming soon'));
+      if (p.release_at && p.release_at > Date.now()) kids.push(h('p', { class: 'label', style: { marginTop: '14px' } }, 'Launches in'), countdown(p.release_at));
+      const nb = h('button', { class: 'btn primary lg block' }, iconEl('bell'), 'Notify me');
       nb.onclick = () => withBusy(nb, async () => {
         if (!auth.user && !(await E.signInSheet('Sign in to get notified'))) return;
         await api('/api/shop/notify', { body: { productId: p.id } }).then(() => toast('We will email you at launch', 'success')).catch(fail);
       });
-      foot = [nb];
-    } else if (p.soldOut) foot = [h('button', { class: 'btn lg block', disabled: true }, 'Sold out')];
-    else {
-      const add = h('button', { class: 'btn lg', onclick: (e) => addToCart(p, e.currentTarget) }, iconEl('cart'), 'Add to cart');
-      const buy = h('button', { class: 'btn primary lg', style: { flex: 1 } }, 'Buy now', iconEl('arrow'));
-      buy.onclick = () => { if (!S.cart.includes(p.id)) { S.cart.push(p.id); saveCart(); } s.close(); openCart(); };
-      foot = [add, buy];
+      kids.push(nb);
+    } else {
+      kids.push(h('div', { class: 'bb-price' }, h('strong', {}, p.price_cents ? money(p.price_cents) : 'Free'), p.compare_cents > p.price_cents ? h('s', {}, money(p.compare_cents)) : null, off ? h('span', { class: 'chip good' }, `Save ${off}%`) : null));
+      if (p.stockLeft && !p.soldOut) kids.push(h('p', { class: 'muted', style: { fontSize: '13px' } }, `Only ${p.stockLeft} left`));
+      if (p.soldOut) kids.push(h('button', { class: 'btn lg block', disabled: true }, 'Sold out'));
+      else {
+        const buy = h('button', { class: 'btn primary lg block' }, 'Buy now', iconEl('arrow'));
+        buy.onclick = () => { if (!S.cart.includes(p.id)) { S.cart.push(p.id); saveCart(); } openCart(); };
+        kids.push(buy, h('button', { class: 'btn lg block', onclick: (e) => addToCart(p, e.currentTarget) }, iconEl('cart'), 'Add to cart'));
+      }
     }
-    const s = sheet({ body, foot, size: 'wide', title: ' ', onClose: () => { if (location.hash.startsWith('#shop/')) history.replaceState(null, '', '#shop'); } });
+    kids.push(h('div', { class: 'bb-perks' },
+      h('div', {}, iconEl('shield'), 'Secure checkout with PayPal'),
+      p.hasVideo ? h('div', {}, iconEl('key'), 'Personal key, linked to your Google account') : null,
+      h('div', {}, iconEl('invoice'), 'Detailed invoice by email')));
+    box.append(...kids);
+    return box;
+  }
+
+  function renderProductPage(p) {
+    pageCleanup?.();
+    const view = $('#productView');
+    const cat = S.site.categories.find((c) => c.id === p.category_id);
+    const ss = slideshow(p);
+    const more = S.products.filter((x) => x.id !== p.id).slice(0, 3);
+    document.title = `${p.title} — ${S.site.site.name}`;
+    view.replaceChildren(h('div', { class: 'pp' },
+      h('div', { class: 'pp-top' }, h('button', { class: 'btn sm', onclick: () => (history.state?.fromHome ? history.back() : navigate('/')) }, iconEl('chevron-left'), 'Back'),
+        cat ? h('button', { class: 'crumb', onclick: () => { navigate('/'); setCategory(String(cat.id), true); } }, cat.name) : null),
+      ss.el,
+      h('div', { class: 'pp-grid' },
+        h('div', { class: 'pp-info' },
+          cat ? h('p', { class: 'eyebrow' }, cat.name) : null,
+          h('h1', {}, p.title), p.subtitle ? h('p', { class: 'pp-sub' }, p.subtitle) : null,
+          p.badge ? h('span', { class: 'chip brand', style: { marginTop: '12px' } }, p.badge) : null,
+          p.description ? h('p', { class: 'pv-desc', style: { marginTop: '22px' } }, p.description) : null,
+          p.features?.length ? h('div', { class: 'pp-block' }, h('h3', {}, 'What’s included'), h('ul', { class: 'features' }, p.features.map((f) => h('li', {}, iconEl('check'), h('span', {}, f))))) : null,
+          p.deliver_note ? h('div', { class: 'secure-note' }, iconEl('gift'), h('div', {}, h('strong', {}, 'What you get'), h('div', {}, p.deliver_note))) : null,
+          p.hasVideo ? h('div', { class: 'secure-note' }, iconEl('shield'), h('div', {}, h('strong', {}, 'Private streaming'), h('div', {}, 'After payment you get a personal key. Watch it on your private Video Review page — it only works with your Google account.'))) : null,
+          p.tags?.length ? h('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '18px' } }, p.tags.map((t) => h('span', { class: 'chip' }, `#${t}`))) : null),
+        buyBox(p)),
+      more.length ? h('div', { class: 'pp-more' }, h('h2', {}, 'You may also like'), h('div', { class: 'products' }, more.map((x) => productCard(x)))) : null));
+    pageCleanup = () => ss.stop();
+    E.applyTexts(view, 'home');
+  }
+
+  /* ---------- tiny router: "/" = home, "/product/:slug" = product page ---------- */
+  function transition(fn) {
+    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(fn);
+    else fn();
+  }
+  function navigate(path, state = {}) {
+    if (location.pathname + location.hash === path) return;
+    history.pushState(state, '', path);
+    transition(route);
+  }
+  let homeScroll = 0;
+  function route() {
+    const m = location.pathname.match(/^\/product\/([^/]+)/);
+    const p = m && S.products.find((x) => x.slug === decodeURIComponent(m[1]));
+    $$('.p-media img').forEach((img) => { img.style.viewTransitionName = ''; });
+    if (p) {
+      if (!$('#homeView').classList.contains('hidden')) homeScroll = window.scrollY;
+      $('#homeView').classList.add('hidden'); $('#productView').classList.remove('hidden');
+      renderProductPage(p);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    } else {
+      pageCleanup?.(); pageCleanup = null;
+      $('#productView').classList.add('hidden'); $('#productView').replaceChildren();
+      $('#homeView').classList.remove('hidden');
+      document.title = `${S.site.site.name} — ${S.site.site.tagline}`;
+      if (m) toast('That product is no longer available');
+      requestAnimationFrame(() => window.scrollTo({ top: homeScroll, behavior: 'instant' }));
+    }
+    renderNav();
+  }
+  window.addEventListener('popstate', () => transition(route));
+  function openProduct(p, fromImg) {
+    if (fromImg) fromImg.style.viewTransitionName = 'product-hero';
+    navigate(`/product/${encodeURIComponent(p.slug)}`, { fromHome: location.pathname === '/' });
   }
 
   /* ---------- cart & checkout ---------- */

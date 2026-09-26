@@ -264,7 +264,7 @@ function notifyLaunch(id, title, slug) {
     send({ to: n.email, subject: `${title} is out now`, tag: 'launch',
       html: `<div style="font-family:Helvetica,Arial,sans-serif;padding:24px"><h2>${title} is available</h2>
         <p>You asked to be notified — it just launched on ${site.name}.</p>
-        <a href="${PUBLIC_URL}/#shop/${encodeURIComponent(slug)}" style="display:inline-block;padding:12px 22px;border-radius:999px;background:#905abd;color:#fff;text-decoration:none">View it</a></div>` })
+        <a href="${PUBLIC_URL}/product/${encodeURIComponent(slug)}" style="display:inline-block;padding:12px 22px;border-radius:999px;background:#905abd;color:#fff;text-decoration:none">View it</a></div>` })
       .catch(() => {});
   }
   run('DELETE FROM product_notify WHERE product_id = ?', id);

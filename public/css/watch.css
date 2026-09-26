@@ -79,3 +79,6 @@
 @media (max-width: 560px) { .p-vol { display: none; } .p-controls { left: 8px; right: 8px; bottom: 8px; gap: 4px; } }
 .protect-note { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
 .protect-note .i { color: var(--good); }
+
+.nav-title { font-weight: 800; font-size: 15px; letter-spacing: -.01em; }
+@media (max-width: 900px) { .watch-page .nav { grid-template-columns: auto 1fr auto; border-radius: 999px; } .watch-page .nav-side { display: block; } .watch-page .nav-title { text-align: center; } .watch-page .nav-actions { grid-column: auto; grid-row: auto; } }

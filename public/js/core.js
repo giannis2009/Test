@@ -502,11 +502,33 @@
   function setTheme(t, persist = true) {
     document.documentElement.setAttribute('data-theme', t);
     if (persist) { try { localStorage.setItem('ezro-theme', t); } catch { /* private mode */ } }
-    const meta = $('meta[name="theme-color"]'); if (meta) meta.content = t === 'dark' ? '#0d0b12' : '#f7f5fb';
+    const meta = $('meta[name="theme-color"]'); if (meta) meta.content = t === 'dark' ? '#0d0b12' : '#f5f5f7';
+  }
+  // Smooth theme switch: a circular reveal that grows from the button (View Transitions),
+  // falling back to a soft colour cross-fade in browsers without it.
+  function switchTheme(t, from) {
+    const root = document.documentElement;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!document.startViewTransition || reduce) {
+      root.classList.add('theme-fade');
+      setTheme(t);
+      setTimeout(() => root.classList.remove('theme-fade'), 650);
+      return;
+    }
+    const r = from?.getBoundingClientRect();
+    const x = r ? r.left + r.width / 2 : innerWidth - 40; const y = r ? r.top + r.height / 2 : 30;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    root.classList.add('theme-vt');
+    const vt = document.startViewTransition(() => setTheme(t));
+    vt.ready.then(() => {
+      root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 700, easing: 'cubic-bezier(.65,0,.25,1)', pseudoElement: '::view-transition-new(root)' });
+    }).catch(() => {});
+    vt.finished.finally(() => root.classList.remove('theme-vt'));
   }
   function themeButton() {
     const b = h('button', { class: 'btn icon ghost theme-btn', 'aria-label': 'Toggle dark / light theme', html: icon('moon', 'moon') + icon('sun', 'sun') });
-    b.onclick = () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    b.onclick = () => switchTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', b);
     return b;
   }
 
