@@ -1,6 +1,18 @@
 const path = require('node:path');
 try { process.loadEnvFile(path.join(__dirname, '..', '.env')); } catch { /* no .env file */ }
 
+// Local mode (started by start-windows.bat / scripts/live.js, or a .env still holding the
+// example placeholders): always runs as a local test site on http://localhost, whatever the .env says.
+// Never applies on Render.
+if (!process.env.RENDER && (process.env.EZRO_LOCAL === '1' || /example\.com/.test(process.env.PUBLIC_URL || ''))) {
+  const port = Number(process.env.PORT) || 3000;
+  process.env.NODE_ENV = 'development';
+  process.env.PUBLIC_URL = `http://localhost:${port}`;
+  delete process.env.TRUST_PROXY;
+  if (!process.env.GOOGLE_CLIENT_ID) process.env.DEV_LOGIN = '1';
+  console.log('[ezro] Local mode: test login and test payments are on.');
+}
+
 const express = require('express');
 const helmet = require('helmet');
 const { UPLOAD_DIR } = require('./db');

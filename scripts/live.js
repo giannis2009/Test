@@ -31,7 +31,7 @@ function ensureRepo() {
 
 let server = null;
 function startServer() {
-  server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server/index.js'], { cwd: ROOT, stdio: 'inherit' });
+  server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server/index.js'], { cwd: ROOT, stdio: 'inherit', env: { ...process.env, EZRO_LOCAL: '1' } });
   server.on('exit', (code, sig) => { if (sig !== 'SIGTERM' && code !== null && !restarting) say(`Server stopped (code ${code}). Waiting for the next update...`); });
 }
 let restarting = false;

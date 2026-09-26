@@ -1,10 +1,15 @@
 const crypto = require('node:crypto');
-const { run, now } = require('./db');
+const fs = require('node:fs');
+const { run, now, DATA_DIR } = require('./db');
 
+// Without APP_SECRET a random one is created once and kept in the data folder,
+// so logins survive restarts.
 const SECRET = process.env.APP_SECRET || (() => {
-  if (process.env.NODE_ENV === 'production') throw new Error('APP_SECRET must be set in production');
-  console.warn('[ezro] APP_SECRET not set — using a random one (sessions and video tokens reset on restart).');
-  return crypto.randomBytes(32).toString('hex');
+  const file = require('node:path').join(DATA_DIR, '.app-secret');
+  try { return fs.readFileSync(file, 'utf8').trim(); } catch { /* first run */ }
+  const s = crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(file, s, { mode: 0o600 });
+  return s;
 })();
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');

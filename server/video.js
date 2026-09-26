@@ -11,11 +11,12 @@ function driveAuth() {
   if (auth) return auth;
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '';
   if (!raw) return null;
+  if (!raw.trim().startsWith('{') && !fs.existsSync(raw)) return null; // placeholder path, file not there
   const credentials = raw.trim().startsWith('{') ? JSON.parse(raw) : JSON.parse(fs.readFileSync(raw, 'utf8'));
   auth = new GoogleAuth({ credentials, scopes: ['https://www.googleapis.com/auth/drive.readonly'] });
   return auth;
 }
-const driveConfigured = () => !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+const driveConfigured = () => !!driveAuth();
 
 // Accepts a raw file ID or any Drive share URL and returns the file ID.
 function driveId(ref = '') {
