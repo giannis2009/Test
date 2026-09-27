@@ -9,8 +9,16 @@ if (!process.env.RENDER && (process.env.EZRO_LOCAL === '1' || /example\.com/.tes
   process.env.NODE_ENV = 'development';
   process.env.PUBLIC_URL = `http://localhost:${port}`;
   delete process.env.TRUST_PROXY;
-  if (!process.env.GOOGLE_CLIENT_ID) process.env.DEV_LOGIN = '1';
-  console.log('[ezro] Local mode: test login and test payments are on.');
+  if (process.env.EZRO_PUBLIC === '1') {
+    // public through the tunnel: real visitors — the test login and test payments must be OFF
+    process.env.DEV_LOGIN = '0';
+    process.env.TRUST_PROXY = '1'; // https and the visitor's IP come from Cloudflare
+    if (process.env.EZRO_PUBLIC_URL) process.env.PUBLIC_URL = process.env.EZRO_PUBLIC_URL;
+    console.log(`[ezro] Public mode${process.env.EZRO_PUBLIC_URL ? ` at ${process.env.EZRO_PUBLIC_URL}` : ''}: test login and test payments are OFF.`);
+  } else {
+    if (!process.env.GOOGLE_CLIENT_ID) process.env.DEV_LOGIN = '1';
+    console.log('[ezro] Local mode: test login and test payments are on.');
+  }
 }
 
 const express = require('express');

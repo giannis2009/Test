@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Ezro - local server
+if not defined EZRO_TUNNEL title Ezro - local server
 cd /d "%~dp0"
 
 echo.

@@ -138,6 +138,28 @@ public/   index.html, watch.html, admin.html, css/, js/, assets/
 data/     database, uploads, private videos, outbox (not in git)
 ```
 
+## Public από το PC (Tunnel)
+
+Διπλό κλικ στο **`start-public-windows.bat`**.
+- Κάνει ό,τι και το `start-windows.bat`: εκκίνηση και αυτόματες ενημερώσεις.
+- Επιπλέον, το site γίνεται **δημόσιο στο internet** μέσω **Cloudflare Tunnel**. Είναι δωρεάν και δεν χρειάζεται ρύθμιση στο router.
+- Την πρώτη φορά κατεβαίνει μόνο του το `cloudflared` στον φάκελο `bin\`.
+- Στο παράθυρο εμφανίζεται η δημόσια διεύθυνση, π.χ. `https://κάτι.trycloudflare.com`. Τη βρίσκεις και στο `data\PUBLIC-URL.txt`.
+- Σε public mode το **test login** και το **test payment** κλείνουν αυτόματα, για να μην μπορεί κανείς να πάρει προϊόντα δωρεάν.
+- Το site είναι online **μόνο όσο το PC είναι ανοιχτό** και τρέχει το παράθυρο.
+
+**Διεύθυνση που αλλάζει:** η δωρεάν διεύθυνση `trycloudflare.com` αλλάζει σε κάθε εκκίνηση. Αυτό επηρεάζει το Google login, γιατί η διεύθυνση πρέπει να είναι στα *Authorized JavaScript origins*.
+
+**Σταθερή διεύθυνση με δικό σου domain (π.χ. ezro.gr):**
+1. Βάλε το domain στο Cloudflare (δωρεάν λογαριασμός).
+2. Πήγαινε Zero Trust → Networks → **Tunnels** → Create tunnel → Cloudflared.
+3. Στο Public hostname βάλε το domain σου με service `http://localhost:3000`.
+4. Στο `.env` πρόσθεσε:
+```
+CLOUDFLARE_TUNNEL_TOKEN=το-token-του-tunnel
+PUBLIC_DOMAIN=https://ezro.gr
+```
+
 ## Online (Render)
 
 1. https://dashboard.render.com → **New → Blueprint** → διάλεξε το repo `giannis2009/Test`.
