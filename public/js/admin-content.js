@@ -88,7 +88,7 @@
     a = a || { title: '', description: '', cover_url: '', visible: 1, category_id: cat.id };
     const title = input(a.title, { placeholder: 'e.g. Summer Drop 2026', autofocus: true });
     const desc = textarea(a.description, { placeholder: 'Optional — shown on the album page', style: { minHeight: '70px' } });
-    const cover = E.uploadBox({ value: a.cover_url || '', label: 'Album cover', hint: 'Square 1:1 · 3000×3000 px (min 1600×1600)' });
+    const cover = E.uploadBox({ value: a.cover_url || '', label: 'Album cover', hint: 'Portrait 4:5 · 1600×2000 px' });
     const pick = photos.filter((m) => m.type === 'image').length ? h('div', { class: 'mgrid', style: { gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))' } },
       photos.filter((m) => m.type === 'image').map((m) => h('button', { type: 'button', class: 'mitem', style: { padding: 0, cursor: 'pointer' }, title: 'Use as cover', onclick: () => { cover.set(m.url); toast('Cover set — save to apply'); } }, h('img', { src: m.url, alt: '' })))) : null;
     const catSel = select(categories.map((c) => ({ value: c.id, label: c.name, icon: c.icon })), a.category_id);
@@ -120,7 +120,7 @@
     foot.push(h('div', { class: 'spacer' }), visible, save);
     const s = sheet({ title: isNew ? 'New album' : `Album — ${a.title}`, size: 'wide', foot,
       body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Album name', title), field('Category', catSel)), field('Description', desc),
-        field('Cover', cover, 'Best size 3000 × 3000 (square). If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null,
+        field('Cover', cover, 'Best size 1600 × 2000 (4:5 portrait). If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null,
         h('div', { class: 'divider' }),
         h('div', { class: 'panel-title', style: { marginBottom: 0 } }, h('span', { class: 'dot' }), 'Song — plays when the album cover is clicked'),
         h('div', { class: 'row' }, field('Song title', song.song_title), field('Artist', song.artist)),
