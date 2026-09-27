@@ -353,7 +353,6 @@
     });
     card.addEventListener('contextmenu', (e) => e.preventDefault());
     card.addEventListener('dragstart', (e) => e.preventDefault());
-    natural(card, cover, false);
     return hasSong(a) ? songTile(card, albumSong(a)) : card;
   }
 

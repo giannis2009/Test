@@ -438,7 +438,7 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 @media (max-width: 760px) { .album-hero { grid-template-columns: 1fr; gap: 22px; } .album-hero-cover { max-width: 320px; } }
 .album-grid { margin-top: 10px; }
 /* "original size" categories (e.g. 3D ART): every card keeps its file's own proportions, in a masonry flow */
-.albums.masonry { display: block; columns: 3 260px; column-gap: 18px; }
+.albums.masonry { display: block; columns: 250px; column-gap: 18px; }
 .albums.masonry > .album { aspect-ratio: var(--ar, 1); margin-bottom: 18px; break-inside: avoid; }
 @media (max-width: 560px) { .albums.masonry { columns: 2; column-gap: 10px; } .albums.masonry > .album { margin-bottom: 10px; } }
 .album-cover video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
