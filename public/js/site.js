@@ -300,7 +300,7 @@
       h('span', { class: 'album-sheen', 'aria-hidden': 'true' }),
       h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, title ? h('strong', {}, title) : null,
         m.artist ? h('span', { class: 'album-artist' }, m.artist) : null));
-    const open = () => (hasSong(m) ? playSong(mediaSong(m), tile) : lightbox(list, i));
+    const open = () => lightbox(list, i);
     tile.onclick = open;
     tile.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     tile.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -370,7 +370,7 @@
   // if there's no room on the left it opens on the right, then below. If the cover leaves the page, it docks bottom-left.
   function placeSong() {
     const { panel, anchor } = player;
-    if (!panel) return;
+    if (!panel || panel.classList.contains('inline')) return;
     if (!anchor?.isConnected || !anchor.getClientRects().length) {
       if (!panel.classList.contains('docked')) { panel.className = panel.className.replace(/\bside-\w+/g, ''); panel.classList.add('docked'); panel.style.left = ''; panel.style.top = ''; }
       return;
@@ -394,7 +394,7 @@
     panel.style.left = `${x + scrollX}px`; panel.style.top = `${y + scrollY}px`;
   }
   addEventListener('resize', () => placeSong());
-  function playSong(song, anchor) {
+  function playSong(song, anchor, host) {
     // the same cover again → play / pause
     if (player.key === song.key && player.panel) {
       if (player.audio) player.audio.paused ? player.audio.play().catch(() => {}) : player.audio.pause();
@@ -446,6 +446,15 @@
       song.credits ? h('p', { class: 'spn-credits' }, song.credits) : null,
       song.album ? h('button', { type: 'button', class: 'btn sm spn-open', onclick: () => navigate(`/album/${song.album}`) }, 'Open album', iconEl('chevron-right')) : null);
     Object.assign(player, { panel, audio, key: song.key, mo, anchor: anchor || null });
+    if (host) {
+      // inside the full-screen view: sits right next to the big cover, arrow pointing at it
+      panel.classList.add('inline');
+      host.replaceChildren(panel);
+      requestAnimationFrame(() => panel.classList.add('in'));
+      audio?.play().catch(() => {});
+      markPlaying();
+      return;
+    }
     document.body.append(panel);
     placeSong();
     // re-place when its content grows (Spotify loads) or the page changes under it
@@ -495,21 +504,32 @@
 
   function lightbox(items, index) {
     let i = index;
-    const stage = h('div');
+    const stage = h('div', { class: 'lb-stage' });
+    const songSlot = h('div', { class: 'lb-song' });
+    const body = h('div', { class: 'lb-body' }, stage, songSlot);
     const cap = h('div', { class: 'lb-cap' });
-    const close = () => { lb.classList.add('closing'); setTimeout(() => lb.remove(), 250); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    const stopInline = () => { if (player.panel?.classList.contains('inline')) closeSong(); };
+    const close = () => { stopInline(); lb.classList.add('closing'); setTimeout(() => lb.remove(), 250); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
     const show = () => {
       const m = items[i];
-      stage.replaceChildren(m.type === 'video' ? h('video', { src: m.url, controls: true, autoplay: true, playsinline: true, loop: true }) : h('img', { src: m.url, alt: m.title || '' }));
-      stage.firstChild.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.34,1.4,.64,1)' });
-      cap.replaceChildren(m.title ? h('strong', {}, m.title) : '', m.caption ? h('p', {}, m.caption) : '');
+      const el = m.type === 'video' ? h('video', { src: m.url, controls: true, autoplay: true, playsinline: true, loop: true }) : h('img', { src: m.url, alt: m.title || '', draggable: 'false', oncontextmenu: (e) => e.preventDefault() });
+      stage.replaceChildren(el);
+      el.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.34,1.4,.64,1)' });
+      const song = hasSong(m) ? mediaSong(m) : null;
+      body.classList.toggle('has-song', !!song);
+      if (song) {
+        // the song pops out next to the cover and starts playing; clicking the cover plays / pauses it
+        playSong(song, el, songSlot);
+        if (m.type !== 'video') { el.style.cursor = 'pointer'; el.onclick = (e) => { e.stopPropagation(); playSong(song, el, songSlot); }; }
+      } else { stopInline(); songSlot.replaceChildren(); }
+      cap.replaceChildren(!song && m.title ? h('strong', {}, m.title) : '', !song && m.caption ? h('p', {}, m.caption) : '');
     };
     const nav = (d) => { i = (i + d + items.length) % items.length; show(); };
-    const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-modal': 'true' }, stage, cap,
+    const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-modal': 'true' }, body, cap,
       h('button', { class: 'btn icon lb-close', 'aria-label': 'Close', html: icon('close'), onclick: close }),
       items.length > 1 ? h('button', { class: 'btn icon lb-nav prev', 'aria-label': 'Previous', html: icon('chevron-left'), onclick: (e) => { e.stopPropagation(); nav(-1); } }) : null,
       items.length > 1 ? h('button', { class: 'btn icon lb-nav next', 'aria-label': 'Next', html: icon('chevron-right'), onclick: (e) => { e.stopPropagation(); nav(1); } }) : null);
-    lb.onclick = (e) => { if (e.target === lb) close(); };
+    lb.onclick = (e) => { if (e.target === lb || e.target === body || e.target === stage || e.target === songSlot) close(); };
     const onKey = (e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') nav(1); if (e.key === 'ArrowLeft') nav(-1); };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';

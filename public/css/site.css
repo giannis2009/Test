@@ -92,7 +92,23 @@
 /* lightbox */
 .lightbox { position: fixed; inset: 0; z-index: 950; display: grid; place-items: center; padding: 30px; background: rgba(5, 3, 9, .86); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); animation: fadeIn .3s; }
 .lightbox.closing { animation: fadeOut .25s forwards; }
-.lightbox img, .lightbox video { max-width: 100%; max-height: 82vh; border-radius: 16px; box-shadow: 0 40px 100px rgba(0, 0, 0, .6); }
+.lb-body { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 30px; padding: 0 56px; }
+.lb-stage { flex: 0 1 auto; min-width: 0; display: grid; place-items: center; }
+.lightbox .lb-stage img, .lightbox .lb-stage video { display: block; max-width: 100%; max-height: 82vh; border-radius: 16px; box-shadow: 0 40px 100px rgba(0, 0, 0, .6); }
+.lb-body.has-song .lb-stage img, .lb-body.has-song .lb-stage video { max-width: min(100%, 78vh); }
+.lb-song { flex: none; }
+.lb-song:empty { display: none; }
+.song-panel.inline { position: relative; left: auto; top: auto; width: 340px; transform: translateX(-16px) scale(.96); transform-origin: left center; }
+.song-panel.inline.in { transform: none; }
+.song-panel.inline .spn-arrow { left: -9px; top: calc(50% - 8px); border-right: 0; border-top: 0; }
+@media (max-width: 860px) {
+  .lb-body { flex-direction: column; gap: 18px; padding: 50px 0 10px; overflow: auto; justify-content: flex-start; }
+  .lb-body.has-song .lb-stage img, .lb-body.has-song .lb-stage video { max-height: 52vh; }
+  .lightbox .lb-nav { top: auto; bottom: 18px; }
+  .lb-body { padding-bottom: 76px; }
+  .song-panel.inline { width: min(340px, calc(100vw - 40px)); transform: translateY(-12px) scale(.96); transform-origin: center top; }
+  .song-panel.inline .spn-arrow { left: calc(50% - 8px); top: -9px; border-right: 0; border-bottom: 0; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+}
 .lightbox .lb-cap { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; color: #fff; }
 .lightbox .lb-cap p { color: rgba(255, 255, 255, .65); font-size: 14px; }
 .lightbox .lb-close, .lightbox .lb-nav { position: absolute; color: #fff; background: rgba(255, 255, 255, .12); border-color: transparent; }
