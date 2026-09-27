@@ -299,3 +299,8 @@ table.t tbody tr.click:hover { background: var(--hover); }
 @media (prefers-reduced-motion: reduce) { .lg-orb, .lg-card, .lg-card.shake { animation: none; } }
 .stack { display: grid; gap: 18px; align-content: start; }
 .stack > .panel { margin: 0; }
+.cred-card { display: grid; gap: 2px; padding: 6px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); }
+.cred-row { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 12px; border-radius: 12px; }
+.cred-row + .cred-row { border-top: 1px solid var(--border); border-radius: 0; }
+.cred-row span { width: 78px; flex: none; font-size: 12px; color: var(--muted); }
+.cred-row strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }

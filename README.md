@@ -60,19 +60,17 @@ npm start                # http://localhost:3000
 
 ## Admin login
 
-Το Admin Panel **δεν** ανοίγει με email ή Google. Ανοίγει μόνο με ένα κρυφό **username** και **password**.
+Το Admin Panel **δεν** ανοίγει με email ή Google. Ανοίγει μόνο με **username** και **password**.
 
-1. Στην πρώτη εκκίνηση ο server γράφει στο παράθυρο έναν **setup code** (και στο `data/ADMIN-SETUP-CODE.txt`).
-2. Άνοιξε το `/admin`, βάλε τον κωδικό και διάλεξε username και password (τουλάχιστον 10 χαρακτήρες).
-3. Αλλαγή οποτεδήποτε: Admin → Admins & Security → «Your login» (ζητάει τον τωρινό κωδικό).
+- **Owner:** ο λογαριασμός του ιδιοκτήτη υπάρχει ήδη μέσα στο site. Τα στοιχεία του τα έχει μόνο ο ιδιοκτήτης και δεν υπάρχουν πουθενά σε αυτό το repo. Υπάρχει μόνο το κρυπτογραφημένο hash του κωδικού.
+- **Logins για άλλους:** Admin → Admins & Security → «Create a login for someone». Γράφεις username, πατάς «Generate password» και μετά «Create login». Με το «Copy login details» τα στέλνεις στο άτομο.
+- **Αλλαγή δικού σου username / password:** Admins & Security → «Your login».
 
 Ασφάλεια:
 - Οι κωδικοί αποθηκεύονται μόνο ως scrypt hash.
 - Μετά από 5 λάθος προσπάθειες η σύνδεση κλειδώνει για 5 λεπτά, και ο χρόνος διπλασιάζεται κάθε φορά.
 - Κάθε προσπάθεια γράφεται στα Logs.
-- Το session είναι σε httpOnly/SameSite cookie. Όταν αλλάζεις κωδικό, αποσυνδέονται όλες οι άλλες συσκευές.
-
-Στο Render μπορείς να βάλεις `ADMIN_USERNAME` και `ADMIN_PASSWORD`. Χρησιμοποιούνται μόνο για τον πρώτο λογαριασμό.
+- Το session είναι σε httpOnly/SameSite cookie.
 
 ## Ρυθμίσεις (.env)
 
@@ -114,7 +112,7 @@ data/     database, uploads, private videos, outbox (not in git)
 ## Online (Render)
 
 1. https://dashboard.render.com → **New → Blueprint** → διάλεξε το repo `giannis2009/Test`.
-2. Συμπλήρωσε `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `PUBLIC_URL`, `GOOGLE_CLIENT_ID` (και PayPal / SMTP όταν τα έχεις) → **Apply**.
+2. Συμπλήρωσε `PUBLIC_URL`, `GOOGLE_CLIENT_ID` (και PayPal / SMTP όταν τα έχεις) → **Apply**.
 3. Στο Google Cloud (OAuth client) πρόσθεσε το `PUBLIC_URL` στα *Authorized JavaScript origins*.
 
 Η βάση και τα uploads μένουν στον δίσκο `/var/data` (δεν χάνονται σε κάθε ενημέρωση).

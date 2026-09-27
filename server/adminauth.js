@@ -3,7 +3,7 @@
    - passwords hashed with scrypt (salted), compared in constant time
    - brute-force lock per IP and per username, with a delay on every failure
    - own httpOnly SameSite=Strict cookie, sessions stored hashed and revocable
-   - first owner account is created once with a one-time setup code shown in the server window
+   - no sign-up: a built-in owner login, and the owner creates every other login inside the panel
    ========================================================= */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -69,24 +69,19 @@ function addFail(key, limit) {
 setInterval(() => { const t = Date.now(); for (const [k, f] of fails) if (f.until < t && t - f.first > FAIL_WINDOW * 4) fails.delete(k); }, 10 * 60_000).unref();
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* ---------- one-time setup code for the very first (owner) account ---------- */
-const SETUP_FILE = path.join(DATA_DIR, 'ADMIN-SETUP-CODE.txt');
-let setupCode = null;
-const hasAccounts = () => !!get('SELECT 1 FROM admin_accounts LIMIT 1');
-function prepareSetup() {
-  // an owner can also be created from the environment (e.g. on Render): ADMIN_USERNAME + ADMIN_PASSWORD
-  const u = str(process.env.ADMIN_USERNAME, 32); const pw = process.env.ADMIN_PASSWORD || '';
-  if (!hasAccounts() && USERNAME_RE.test(u) && !checkPassword(pw, u)) {
-    run("INSERT INTO admin_accounts (username, pass_hash, role, created_at, created_by, pw_changed_at) VALUES (?, ?, 'owner', ?, 'env', ?)", u, hashPassword(pw), now(), now());
-    log('system', 'admin.account_created', u, 'from ADMIN_USERNAME / ADMIN_PASSWORD');
+/* ---------- the owner login ---------- */
+// The owner account is built in: its password is stored only as a scrypt hash (the password itself was handed to the owner privately).
+// It is created once; after that the owner can change the username and password in Admins & Security and it is never re-created.
+// There is no sign-up / setup screen — new logins are made by the owner inside the panel.
+const OWNER_SEED = { username: 'owner.uh4tv', hash: 'scrypt$16384$8$1$uVLbM1dJU2Rh76OxY2fxTA==$caYoviK63CDQfRtpm0mvVX2KLziPcR1b5CQzWB4GLLToNvMkkPwiPmd53tkmp6mMIQLlfD79u/SI/bDPinQLcw==' };
+db.exec('CREATE TABLE IF NOT EXISTS admin_meta (k TEXT PRIMARY KEY, v TEXT)');
+if (!get("SELECT 1 FROM admin_meta WHERE k = 'owner_seeded'")) {
+  if (!get('SELECT 1 FROM admin_accounts WHERE username = ?', OWNER_SEED.username)) {
+    run("INSERT INTO admin_accounts (username, pass_hash, role, created_at, created_by, pw_changed_at) VALUES (?, ?, 'owner', ?, 'built-in', ?)", OWNER_SEED.username, OWNER_SEED.hash, now(), now());
   }
-  if (hasAccounts()) { fs.rm(SETUP_FILE, { force: true }, () => {}); return; }
-  setupCode = crypto.randomBytes(4).toString('hex').toUpperCase().replace(/(.{4})/, '$1-');
-  const msg = `Ezro admin setup code: ${setupCode}\nOpen /admin, enter this code and create your admin username and password.\nThis file is deleted automatically once the account exists.\n`;
-  try { fs.writeFileSync(SETUP_FILE, msg, { mode: 0o600 }); } catch { /* read-only disk */ }
-  console.log(`\n  ┌──────────────────────────────────────────────┐\n  │  ADMIN SETUP CODE:  ${setupCode}                │\n  │  Open /admin to create your admin login.     │\n  └──────────────────────────────────────────────┘\n`);
+  run("INSERT INTO admin_meta (k, v) VALUES ('owner_seeded', ?)", String(now()));
 }
-prepareSetup();
+fs.rm(path.join(DATA_DIR, 'ADMIN-SETUP-CODE.txt'), { force: true }, () => {});
 
 /* ---------- sessions ---------- */
 function cookieOpts(maxAge) {
@@ -129,32 +124,8 @@ const isOwnerReq = (req) => req.admin?.role === 'owner';
 const router = express.Router();
 
 router.get('/status', (req, res) => res.json({
-  setup: !hasAccounts(),
   admin: req.admin ? { username: req.admin.username, role: req.admin.role } : null,
 }));
-
-router.post('/setup', async (req, res) => {
-  const ip = clientIp(req);
-  if (lockedFor(`ip:${ip}`)) throw new HttpError(429, 'Too many attempts. Try again later.');
-  if (hasAccounts() || !setupCode) throw new HttpError(400, 'The admin account already exists — sign in instead.');
-  const code = str(req.body?.code, 20).toUpperCase().replace(/[^A-F0-9]/g, '');
-  const want = setupCode.replace(/-/g, '');
-  if (code.length !== want.length || !crypto.timingSafeEqual(Buffer.from(code), Buffer.from(want))) {
-    addFail(`ip:${ip}`, 5); await pause(600);
-    throw new HttpError(401, 'Wrong setup code.');
-  }
-  const username = str(req.body?.username, 32);
-  if (!USERNAME_RE.test(username)) throw new HttpError(400, 'Username: 3–32 letters, numbers, dot, dash or underscore.');
-  const bad = checkPassword(req.body?.password, username);
-  if (bad) throw new HttpError(400, bad);
-  const r = run("INSERT INTO admin_accounts (username, pass_hash, role, created_at, created_by, pw_changed_at) VALUES (?, ?, 'owner', ?, 'setup', ?)",
-    username, hashPassword(req.body.password), now(), now());
-  setupCode = null; fs.rm(SETUP_FILE, { force: true }, () => {});
-  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', Number(r.lastInsertRowid));
-  startSession(req, res, acc, false);
-  req.user = { email: username }; log(req, 'admin.account_created', username, 'owner (first setup)');
-  res.json({ ok: true, admin: { username: acc.username, role: acc.role } });
-});
 
 router.post('/login', async (req, res) => {
   const ip = clientIp(req);

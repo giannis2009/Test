@@ -38,7 +38,7 @@ if not exist node_modules (
 rem ---- 3. .env for local testing ------------------------------------------
 if not exist .env (
   echo [3/4] First run - creating .env for local testing.
-  echo    The admin panel uses a secret username + password - open /admin, the setup code is shown below.
+  echo    The admin panel opens at /admin with your owner username + password.
   call :writeenv
 ) else (
   echo [3/4] .env already exists.

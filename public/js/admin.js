@@ -116,7 +116,7 @@
   async function boot() {
     let st;
     try { st = await api('/api/admin-auth/status'); } catch (e) { fail(e); return; }
-    if (!st.admin) return loginScreen(st.setup ? 'setup' : null);
+    if (!st.admin) return loginScreen(null);
     Admin.me = { ...st.admin, name: st.admin.username, email: st.admin.role };
     Admin.site = await api('/api/public/site').catch(() => null);
     if (Admin.site) { E.setCurrency(Admin.site.checkout.currency); E.applyAppearance({ ...Admin.site.appearance, orbs: false, grid: false }); }
@@ -126,7 +126,7 @@
     route();
   }
 
-  /* ---------- login panel: secret username + password (and the one-time owner setup) ---------- */
+  /* ---------- login panel: secret username + password ---------- */
   // strength 0–4 from length and character variety
   Admin.pwStrength = (pw) => {
     if (!pw) return 0;
@@ -136,6 +136,13 @@
     if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) sc++;
     if (pw.length < 10) sc = Math.min(sc, 1);
     return Math.min(4, sc);
+  };
+  // strong, easy-to-read password for handing to someone (no 0/O/1/l)
+  Admin.genPassword = () => {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    const r = crypto.getRandomValues(new Uint32Array(22));
+    const c = [...r].map((n) => A[n % A.length]).join('');
+    return `${c.slice(0, 6)}-${c.slice(6, 12)}-${c.slice(12, 18)}-${c.slice(18)}`;
   };
   Admin.pwField = (placeholder, { autocomplete = 'current-password', meter = false } = {}) => {
     const inp = h('input', { class: 'input', type: 'password', placeholder, autocomplete, spellcheck: 'false', maxlength: '200' });
@@ -156,17 +163,14 @@
     return { el: h('div', { class: 'lg-group' }, wrap, caps, bar), input: inp };
   };
   function loginScreen(mode) {
-    const setup = mode === 'setup';
-    document.title = setup ? 'Create admin login — Ezro' : 'Admin — Ezro';
+    document.title = 'Admin — Ezro';
     const err = h('div', { class: 'lg-error', role: 'alert', 'aria-live': 'assertive' });
     const showErr = (m) => { err.replaceChildren(iconEl('shield'), h('span', {}, m)); err.classList.add('on'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); };
     const user = h('input', { class: 'input', placeholder: 'Username', autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', maxlength: '32' });
     const userField = h('div', { class: 'lg-field' }, h('span', { class: 'lg-ic', html: icon('user') }), user);
-    const pw = Admin.pwField(setup ? 'Create a password' : 'Password', { autocomplete: setup ? 'new-password' : 'current-password', meter: setup });
-    const pw2 = setup ? Admin.pwField('Repeat the password', { autocomplete: 'new-password' }) : null;
-    const code = setup ? h('input', { class: 'input mono', placeholder: 'XXXX-XXXX', autocomplete: 'one-time-code', maxlength: '9', style: { letterSpacing: '.18em', textTransform: 'uppercase' } }) : null;
+    const pw = Admin.pwField('Password');
     const remember = h('label', { class: 'lg-remember' }, h('input', { type: 'checkbox' }), h('span', { class: 'lg-check', html: icon('check') }), 'Keep me signed in for 14 days');
-    const go = h('button', { class: 'btn primary lg block lg-go', type: 'submit' }, h('span', {}, setup ? 'Create admin login' : 'Sign in'), iconEl('arrow'));
+    const go = h('button', { class: 'btn primary lg block lg-go', type: 'submit' }, h('span', {}, 'Sign in'), iconEl('arrow'));
     let lockT = null;
     const lock = (secs) => {
       clearInterval(lockT); go.disabled = true;
@@ -179,34 +183,26 @@
       tick(); lockT = setInterval(tick, 1000);
     };
     const form = h('form', { class: 'lg-form', novalidate: true },
-      setup ? h('div', { class: 'lg-group' }, h('label', { class: 'lg-label' }, 'Setup code'), h('div', { class: 'lg-field' }, h('span', { class: 'lg-ic', html: icon('key') }), code),
-        h('p', { class: 'lg-hint' }, 'Shown once in the server window, and saved in ', h('code', {}, 'data/ADMIN-SETUP-CODE.txt'), '.')) : null,
-      h('div', { class: 'lg-group' }, setup ? h('label', { class: 'lg-label' }, 'Username') : null, userField,
-        setup ? h('p', { class: 'lg-hint' }, '3–32 letters or numbers. Keep it secret — it is half of your login.') : null),
-      h('div', { class: 'lg-group' }, setup ? h('label', { class: 'lg-label' }, 'Password') : null, pw.el),
-      pw2 ? pw2.el : null,
+      h('div', { class: 'lg-group' }, userField),
+      h('div', { class: 'lg-group' }, pw.el),
       err,
-      setup ? null : remember,
+      remember,
       go);
     form.onsubmit = async (e) => {
       e.preventDefault();
       if (go.disabled) return;
       err.classList.remove('on');
-      if (setup && !code.value.trim()) { showErr('Enter the setup code.'); code.focus(); return; }
       if (!user.value.trim()) { showErr('Enter your username.'); user.focus(); return; }
       if (!pw.input.value) { showErr('Enter your password.'); pw.input.focus(); return; }
-      if (setup && pw.input.value !== pw2.input.value) { showErr('The two passwords are not the same.'); pw2.input.focus(); return; }
       go.classList.add('loading'); go.disabled = true;
       try {
-        const body = setup ? { code: code.value, username: user.value.trim(), password: pw.input.value }
-          : { username: user.value.trim(), password: pw.input.value, remember: remember.querySelector('input').checked };
-        await api(setup ? '/api/admin-auth/setup' : '/api/admin-auth/login', { body });
+        await api('/api/admin-auth/login', { body: { username: user.value.trim(), password: pw.input.value, remember: remember.querySelector('input').checked } });
         card.classList.add('ok');
-        go.replaceChildren(iconEl('check'), h('span', {}, setup ? 'Account created' : 'Welcome'));
+        go.replaceChildren(iconEl('check'), h('span', {}, 'Welcome'));
         setTimeout(() => { location.hash = location.hash || '#/dashboard'; boot(); }, 520);
       } catch (ex) {
         go.classList.remove('loading'); go.disabled = false;
-        pw.input.value = ''; if (pw2) pw2.input.value = '';
+        pw.input.value = '';
         showErr(ex.message);
         const m = /(\d+) min/.exec(ex.message); if (ex.status === 429 && m) lock(Number(m[1]) * 60);
         pw.input.focus();
@@ -215,10 +211,10 @@
     const note = mode === 'expired' ? 'Your session ended. Sign in again.' : mode === 'signedout' ? 'You are signed out.' : null;
     const card = h('div', { class: 'lg-card' },
       h('div', { class: 'lg-top' },
-        h('div', { class: 'lg-badge', html: icon(setup ? 'sparkles' : 'shield') }),
+        h('div', { class: 'lg-badge', html: icon('shield') }),
         h('img', { class: 'lg-logo', src: '/assets/logo.webp', alt: 'Ezro' })),
-      h('h1', {}, setup ? 'Create your admin login' : 'Admin'),
-      h('p', { class: 'lg-sub' }, setup ? 'First time here — choose the secret username and password that will open this panel.' : 'Restricted area. Sign in with your admin username and password.'),
+      h('h1', {}, 'Admin'),
+      h('p', { class: 'lg-sub' }, 'Restricted area. Sign in with your admin username and password.'),
       note ? h('div', { class: 'lg-note' }, iconEl('clock'), note) : null,
       form,
       h('div', { class: 'lg-foot' }, iconEl('lock'), 'Encrypted session · every attempt is logged'));
@@ -227,7 +223,7 @@
       h('a', { class: 'lg-back', href: '/' }, iconEl('chevron-left'), 'Back to site'),
       h('div', { class: 'lg-theme' }, E.themeButton()),
       card));
-    requestAnimationFrame(() => (setup ? code : user).focus());
+    requestAnimationFrame(() => user.focus());
   }
 
   /* ---------- bar chart (single series, hover tooltip) ---------- */
@@ -401,16 +397,32 @@
     const np = Admin.pwField('Password for this admin', { autocomplete: 'new-password', meter: true });
     let role = 'admin';
     const roleSeg = E.segmented([['admin', 'Admin'], ['owner', 'Owner']], role, (v) => { role = v; });
-    const add = h('button', { class: 'btn primary' }, iconEl('plus'), 'Add admin');
+    const gen = h('button', { type: 'button', class: 'btn' }, iconEl('sparkles'), 'Generate password');
+    gen.onclick = () => { np.input.value = Admin.genPassword(); np.input.type = 'text'; np.input.dispatchEvent(new Event('input')); };
+    const add = h('button', { class: 'btn primary' }, iconEl('plus'), 'Create login');
+    // after creating: one card with everything to hand over, copied in one click
+    const shareSheet = (username, password) => {
+      const text = `Ezro admin login\n${location.origin}/admin\nUsername: ${username}\nPassword: ${password}`;
+      const row = (k, v) => h('div', { class: 'cred-row' }, h('span', {}, k), h('strong', { class: 'mono' }, v), h('button', { type: 'button', class: 'btn icon sm ghost', 'aria-label': `Copy ${k}`, html: icon('copy'), onclick: () => E.copy(v) }));
+      const copyAll = h('button', { class: 'btn primary' }, iconEl('copy'), 'Copy login details');
+      copyAll.onclick = () => E.copy(text);
+      const sh = E.sheet({ title: 'Login created', body: h('div', { class: 'form' },
+        h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'Send these privately. The password is shown only now — it is stored encrypted and cannot be seen again.'),
+        h('div', { class: 'cred-card' }, row('Link', `${location.origin}/admin`), row('Username', username), row('Password', password))),
+      foot: [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => { sh.close(); Admin.refresh(); } }, 'Done'), copyAll] });
+    };
     add.onclick = () => withBusy(add, async () => {
-      try { await api('/api/admin/accounts', { body: { username: nu.value.trim(), password: np.input.value, role } }); toast('Admin added — give them the username and password privately', 'success', 4500); Admin.refresh(); } catch (e) { fail(e); }
+      const u = nu.value.trim(); const pw = np.input.value;
+      try { await api('/api/admin/accounts', { body: { username: u, password: pw, role } }); shareSheet(u, pw); } catch (e) { fail(e); }
     });
     const resetPw = async (a) => {
       const f = Admin.pwField('New password', { autocomplete: 'new-password', meter: true });
+      const g = h('button', { type: 'button', class: 'btn sm' }, iconEl('sparkles'), 'Generate');
+      g.onclick = () => { f.input.value = Admin.genPassword(); f.input.type = 'text'; f.input.dispatchEvent(new Event('input')); };
       const ok = h('button', { class: 'btn primary' }, 'Set password');
-      const sh = E.sheet({ title: `New password for ${a.username}`, body: h('div', { class: 'form' }, h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'They are signed out everywhere and use the new password next time.'), f.el),
+      const sh = E.sheet({ title: `New password for ${a.username}`, body: h('div', { class: 'form' }, h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'They are signed out everywhere and use the new password next time.'), f.el, h('div', {}, g)),
         foot: [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => sh.close() }, 'Cancel'), ok] });
-      ok.onclick = () => withBusy(ok, async () => { try { await api(`/api/admin/accounts/${a.id}/password`, { method: 'PUT', body: { password: f.input.value } }); toast('Password changed', 'success'); sh.close(); } catch (e) { fail(e); } });
+      ok.onclick = () => withBusy(ok, async () => { const pw = f.input.value; try { await api(`/api/admin/accounts/${a.id}/password`, { method: 'PUT', body: { password: pw } }); sh.close(); shareSheet(a.username, pw); } catch (e) { fail(e); } });
     };
     const list = h('div', { class: 'list' }, accounts.map((a) => h('div', { class: 'lrow' },
       h('div', { class: 'ic', html: icon(a.role === 'owner' ? 'shield' : 'user') }),
@@ -449,7 +461,7 @@
           Admin.panel('Admin accounts',
             h('p', { class: 'desc' }, canManage ? 'Owners can add admins, set their passwords and remove them.' : 'Only an owner can add or remove admins.'),
             list,
-            canManage ? h('div', { class: 'form', style: { marginTop: '16px' } }, h('div', { class: 'row' }, E.field('Username', nu), E.field('Role', roleSeg)), E.field('Password', np.el), h('div', { class: 'form-actions' }, add)) : null),
+            canManage ? h('div', { class: 'form', style: { marginTop: '16px' } }, h('div', { class: 'panel-title', style: { marginBottom: 0 } }, h('span', { class: 'dot' }), 'Create a login for someone'), h('div', { class: 'row' }, E.field('Username', nu), E.field('Role', roleSeg, 'Owners can manage logins and reset data.')), E.field('Password', h('div', { style: { display: 'grid', gap: '8px' } }, np.el, h('div', {}, gen))), h('div', { class: 'form-actions' }, add)) : null),
           Admin.panel('Video protection', h('div', { class: 'form' }, blur, dev,
             E.field('Maximum viewing sessions per key', maxv, '0 = unlimited. A session counts once per 30 minutes.'),
             h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
