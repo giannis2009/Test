@@ -93,7 +93,6 @@
     'arrow-up-right': '<path d="M7 17L17 7M8 7h9v9"/>',
     database: '<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
     heart: '<path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.9 4 7.4 4c2 0 3.5 1.1 4.6 2.7C13.1 5.1 14.6 4 16.6 4c3.5 0 5.8 3.6 4.6 7.1-1.7 4.8-9.2 9.4-9.2 9.4z"/>',
-    'thumb-down': '<path d="M16.5 3.5v10M16.5 13.5l-3.7 7c-.3.6-1 .9-1.6.7-1-.3-1.6-1.3-1.4-2.3l.8-4.4H5.2a2 2 0 01-2-2.3l1.2-7A2 2 0 016.4 3.5h10.1M16.5 3.5h2.8a1.5 1.5 0 011.5 1.5v7a1.5 1.5 0 01-1.5 1.5h-2.8"/>',
     music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
     copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',
     refresh: '<path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/>',
@@ -524,14 +523,14 @@
     }
     const r = from?.getBoundingClientRect();
     const x = r ? r.left + r.width / 2 : innerWidth - 40; const y = r ? r.top + r.height / 2 : 30;
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    root.classList.add('theme-vt');
+    // far enough that the soft edge (220px) has fully left the screen at the end
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 240;
+    root.style.setProperty('--vt-x', `${x}px`); root.style.setProperty('--vt-y', `${y}px`); root.style.setProperty('--vt-max', `${radius}px`);
+    // browsers that can't animate the mask radius get a smooth cross-fade instead
+    const feather = typeof CSS !== 'undefined' && CSS.registerProperty !== undefined;
+    root.classList.add(feather ? 'theme-vt' : 'theme-vt-fade');
     const vt = document.startViewTransition(() => setTheme(t));
-    vt.ready.then(() => {
-      root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-        { duration: 700, easing: 'cubic-bezier(.65,0,.25,1)', pseudoElement: '::view-transition-new(root)' });
-    }).catch(() => {});
-    vt.finished.finally(() => root.classList.remove('theme-vt'));
+    vt.finished.finally(() => root.classList.remove('theme-vt', 'theme-vt-fade'));
   }
   function themeButton() {
     const b = h('button', { class: 'btn icon ghost theme-btn', 'aria-label': 'Toggle dark / light theme', html: icon('moon', 'moon') + icon('sun', 'sun') });

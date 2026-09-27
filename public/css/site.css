@@ -569,8 +569,6 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .rx-n { font-variant-numeric: tabular-nums; min-width: 1ch; }
 .rx-like.on { color: #ff4d7d; border-color: color-mix(in srgb, #ff4d7d 40%, transparent); background: color-mix(in srgb, #ff4d7d 12%, var(--surface)); }
 .rx-like.on .i { fill: currentColor; }
-.rx-dis.on { color: var(--brand-2); border-color: color-mix(in srgb, var(--brand-2) 40%, transparent); background: color-mix(in srgb, var(--brand) 12%, var(--surface)); }
-.rx-dis.on .i { fill: color-mix(in srgb, currentColor 25%, transparent); }
 .rx-btn.pop .i { animation: rxPop .5s var(--spring); }
 @keyframes rxPop { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 100% { transform: scale(1); } }
 .rx-burst { position: fixed; z-index: 2000; pointer-events: none; color: #ff4d7d; }

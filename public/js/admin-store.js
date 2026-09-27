@@ -79,7 +79,7 @@
     const grid = h('div', { class: 'pgrid' }, products.map((p) => h('article', { class: 'pcard', dataset: { id: p.id }, onclick: () => editProduct(p, categories) },
       h('div', { class: 'cv' }, p.cover_url ? h('img', { src: p.cover_url, alt: '' }) : iconEl('box'), h('div', { class: 'chips' }, statusChip(p), p.badge ? h('span', { class: 'chip brand' }, p.badge) : null), h('span', { class: 'handle', html: icon('grip'), title: 'Drag to reorder' })),
       h('div', { class: 'bd' }, h('strong', {}, p.title), h('div', { class: 'r' }, h('span', {}, catName(p.category_id)), h('span', {}, h('strong', { style: { color: 'var(--text)' } }, A.money(p.price_cents)))),
-        h('div', { class: 'r' }, h('span', {}, `${p.sold} sold${p.stock != null ? ` · ${p.stock} left` : ''} · ❤️ ${p.likes || 0} · 👎 ${p.dislikes || 0}`), p.status === 'coming_soon' ? h('span', {}, `${p.waiting} waiting`) : h('span', {}, p.video_source !== 'none' ? '🔒 video' : ''))))));
+        h('div', { class: 'r' }, h('span', {}, `${p.sold} sold${p.stock != null ? ` · ${p.stock} left` : ''} · ❤️ ${p.likes || 0}`), p.status === 'coming_soon' ? h('span', {}, `${p.waiting} waiting`) : h('span', {}, p.video_source !== 'none' ? '🔒 video' : ''))))));
     E.dragSort({ containers: [grid], item: '.pcard', handle: '.handle', onDrop: () => A.reorder('products', $$('.pcard', grid).map((c) => Number(c.dataset.id))) });
     return [A.head('Products', 'Everything you sell — drag to change the order in the shop.', A.btn('Add Product', 'plus', () => editProduct(null, categories), 'primary')),
       h('div', { class: 'page' }, products.length ? grid : h('div', { class: 'empty' }, iconEl('box'), 'No products yet.', A.btn('Add your first product', 'plus', () => editProduct(null, categories), 'primary')))];

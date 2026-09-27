@@ -594,26 +594,24 @@
     const KIND = { product: 'Product', album: 'Album', media: 'Cover' };
     let filter = 'all';
     const listBox = h('div');
-    const pct = (x) => (x.likes + x.dislikes ? Math.round((x.likes / (x.likes + x.dislikes)) * 100) : 0);
     const draw = () => {
       const rows = items.filter((x) => filter === 'all' || x.type === filter);
       listBox.replaceChildren(rows.length ? h('div', { class: 'list' }, rows.map((x, i) => h('div', { class: 'lrow lk-row' },
         h('span', { class: 'lk-rank' }, `#${i + 1}`),
         x.image ? h('img', { class: 'lk-img', src: x.image, alt: '' }) : h('div', { class: 'ic', html: icon('image') }),
         h('div', { class: 'tt' }, h('strong', {}, x.title || '—'), h('span', {}, `${KIND[x.type]} · last vote ${E.timeAgo(x.last)}`)),
-        h('div', { class: 'lk-bar', title: `${pct(x)}% like it` }, h('i', { style: { width: `${pct(x)}%` } })),
-        h('span', { class: 'lk-n like' }, '❤️ ', String(x.likes)), h('span', { class: 'lk-n' }, '👎 ', String(x.dislikes)),
+        h('div', { class: 'lk-bar', title: `${x.likes} likes` }, h('i', { style: { width: `${Math.round((x.likes / (items[0]?.likes || 1)) * 100)}%` } })),
+        h('span', { class: 'lk-n like' }, '❤️ ', String(x.likes)),
         h('button', { class: 'btn icon sm ghost', 'aria-label': 'Reset votes', title: 'Reset votes', html: icon('refresh'), onclick: async () => {
-          if (await E.confirmDialog(`Reset the votes of “${x.title}”?`, 'Its likes and dislikes go back to zero.', { ok: 'Reset', danger: true })) { await api(`/api/admin/reactions/${x.type}/${x.id}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); }
+          if (await E.confirmDialog(`Reset the votes of “${x.title}”?`, 'Its likes go back to zero.', { ok: 'Reset', danger: true })) { await api(`/api/admin/reactions/${x.type}/${x.id}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); }
         } }))))
         : h('div', { class: 'empty' }, iconEl('heart'), 'No votes yet — they appear here as soon as visitors tap the heart.'));
     };
     draw();
-    return [Admin.head('Likes', 'What people love — hearts and thumbs-down on products, albums and covers.'),
+    return [Admin.head('Likes', 'What people love — hearts on products, albums and covers.'),
       h('div', { class: 'page' },
         h('div', { class: 'stats', style: { marginBottom: '18px' } },
           Admin.stat('Likes', String(totals.likes), 'brand', `${totals.week} this week`),
-          Admin.stat('Not for me', String(totals.dislikes)),
           Admin.stat('People who voted', String(totals.voters)),
           Admin.stat('Most liked', items[0]?.title || '—', '', items[0] ? `❤️ ${items[0].likes}` : '')),
         Admin.panel(h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', width: '100%', flexWrap: 'wrap' } }, h('span', {}, 'Ranking'), h('span', { style: { flex: 1 } }),

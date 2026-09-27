@@ -302,8 +302,7 @@ function productFromBody(b, existing = {}) {
 router.get('/products', (_req, res) => res.json({
   products: all(`SELECT p.*, (SELECT COUNT(*) FROM licenses l WHERE l.product_id = p.id) sold,
     (SELECT COUNT(*) FROM product_notify n WHERE n.product_id = p.id) waiting,
-    (SELECT COUNT(*) FROM reactions r WHERE r.target_type = 'product' AND r.target_id = p.id AND r.value = 1) likes,
-    (SELECT COUNT(*) FROM reactions r WHERE r.target_type = 'product' AND r.target_id = p.id AND r.value = -1) dislikes FROM products p ORDER BY sort, id`)
+    (SELECT COUNT(*) FROM reactions r WHERE r.target_type = 'product' AND r.target_id = p.id AND r.value = 1) likes FROM products p ORDER BY sort, id`)
     .map((p) => ({ ...p, gallery: J(p.gallery, []), features: J(p.features, []), tags: J(p.tags, []), downloads: J(p.downloads, []) })),
 }));
 router.post('/products', (req, res) => {

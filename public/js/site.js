@@ -674,7 +674,7 @@
     tick(); soonTimers.push(setInterval(tick, 1000));
     return el;
   }
-  /* ---------- likes: ❤️ with a count (and 👎) on products, albums and covers — saved in the database ---------- */
+  /* ---------- likes: ❤️ with a count on products, albums and covers — saved in the database ---------- */
   S.react = { counts: {}, mine: {} };
   async function loadReactions() {
     try { S.react = await api('/api/public/reactions'); } catch { /* offline */ }
@@ -682,10 +682,9 @@
   }
   const fmtN = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace('.0', '')}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace('.0', '')}K` : String(n || 0));
   function paintReact(el) {
-    const k = el.dataset.react; const c = S.react.counts[k] || { likes: 0, dislikes: 0 }; const m = S.react.mine[k] || 0;
-    const like = el.querySelector('.rx-like'); const dis = el.querySelector('.rx-dis');
+    const k = el.dataset.react; const c = S.react.counts[k] || { likes: 0 }; const m = S.react.mine[k] || 0;
+    const like = el.querySelector('.rx-like');
     like.classList.toggle('on', m === 1); like.setAttribute('aria-pressed', String(m === 1)); like.querySelector('.rx-n').textContent = fmtN(c.likes);
-    if (dis) { dis.classList.toggle('on', m === -1); dis.setAttribute('aria-pressed', String(m === -1)); dis.querySelector('.rx-n').textContent = fmtN(c.dislikes); }
   }
   let reactBusy = false;
   async function react(key, value, btn) {
@@ -694,16 +693,16 @@
     const cur = S.react.mine[key] || 0;
     const next = cur === value ? 0 : value; // same choice again = take the vote back
     // show it straight away, then confirm with the server
-    const c = { ...(S.react.counts[key] || { likes: 0, dislikes: 0 }) };
-    if (cur === 1) c.likes -= 1; if (cur === -1) c.dislikes -= 1;
-    if (next === 1) c.likes += 1; if (next === -1) c.dislikes += 1;
+    const c = { ...(S.react.counts[key] || { likes: 0 }) };
+    if (cur === 1) c.likes -= 1;
+    if (next === 1) c.likes += 1;
     S.react.counts[key] = c; S.react.mine[key] = next;
     $$(`[data-react="${key}"]`).forEach(paintReact);
     if (next === 1 && btn) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); burst(btn); }
     reactBusy = true;
     try {
       const r = await api('/api/public/react', { body: { type, id: Number(id), value: next } });
-      S.react.counts[key] = { likes: r.likes, dislikes: r.dislikes }; S.react.mine[key] = r.mine;
+      S.react.counts[key] = { likes: r.likes }; S.react.mine[key] = r.mine;
     } catch (e) { fail(e); } finally { reactBusy = false; $$(`[data-react="${key}"]`).forEach(paintReact); }
   }
   // little hearts flying out of the button
@@ -719,13 +718,13 @@
         { duration: 650 + Math.random() * 250, easing: 'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => p.remove();
     }
   }
-  // compact = just the heart and its number (cards); full = ❤️ count + 👎 count (pages, full view)
+  // a heart and its number; compact on cards, a bit bigger on pages and in the full view
   function reactBar(type, id, { compact = false, dark = false } = {}) {
     const key = `${type}:${id}`;
     const btn = (cls, ic, value, label) => h('button', { type: 'button', class: `rx-btn ${cls}`, 'aria-label': label, title: label, onclick: (e) => { e.preventDefault(); e.stopPropagation(); react(key, value, e.currentTarget); } },
       h('span', { class: 'rx-ic', html: icon(ic) }), h('span', { class: 'rx-n' }, '0'));
     const el = h('div', { class: `rx ${compact ? 'compact' : ''} ${dark ? 'dark' : ''}`, dataset: { react: key } },
-      btn('rx-like', 'heart', 1, 'Like'), compact ? null : btn('rx-dis', 'thumb-down', -1, 'Not for me'));
+      btn('rx-like', 'heart', 1, 'Like'));
     paintReact(el);
     return el;
   }
