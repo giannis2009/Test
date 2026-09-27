@@ -121,6 +121,21 @@
     if (legacy) history.replaceState({}, '', `/product/${legacy[1]}`);
     route();
     heroScroll();
+    // links like /#shop (e.g. "Browse the shop" on the profile page) open the products
+    if (location.hash === '#shop') { history.replaceState(history.state, '', '/'); goToProducts(); }
+  }
+  // Opens the products: the PRODUCTS category if it has products, otherwise the shop section with everything.
+  // Waits until the home page is really showing (page change + intro), so nothing scrolls it back afterwards.
+  function goToProducts() {
+    if (location.pathname !== '/') { navigate('/'); setTimeout(goToProducts, 500); return; }
+    if (document.body.classList.contains('loading')) { setTimeout(goToProducts, 200); return; }
+    const pc = S.site.categories.find((c) => c.slug === 'products' || /product/i.test(c.name));
+    const go = () => $('#shop').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (pc && S.products.some((p) => p.category_id === pc.id)) { if (cat !== String(pc.id)) setCategory(String(pc.id)); }
+    else if (cat !== 'all') setCategory('all');
+    setTimeout(go, 380); // after the category swap animation
+    // images above can still be loading and push the shop down while scrolling — land exactly on it
+    setTimeout(() => { const t = $('#shop').getBoundingClientRect().top; if (t > 140 || t < -10) go(); }, 1400);
   }
   // what the signed-in user already owns → shown as "Owned", can't be bought twice
   async function loadOwned() {
@@ -915,7 +930,7 @@
       s.setBody(h('div', { style: { display: 'grid', placeItems: 'center', padding: '40px' } }, h('span', { class: 'spinner' })));
       await refreshQuote();
       if (!S.cart.length || !st.quote) {
-        s.setBody(h('div', { class: 'empty', style: { marginTop: '8px' } }, iconEl('cart'), 'Your cart is empty.', h('a', { class: 'btn sm', href: '#shop', onclick: () => s.close() }, 'Browse the shop')));
+        s.setBody(h('div', { class: 'empty', style: { marginTop: '8px' } }, iconEl('cart'), 'Your cart is empty.', h('a', { class: 'btn sm primary', href: '/', onclick: (e) => { e.preventDefault(); s.close(); setTimeout(goToProducts, 250); } }, iconEl('bag'), 'Browse the shop')));
         s.setFoot([]); return;
       }
       const codeIn = E.input(S.code, { placeholder: 'Discount code', autocomplete: 'off', style: { textTransform: 'uppercase' } });
