@@ -379,7 +379,7 @@
   async function copy(text) { try { await navigator.clipboard.writeText(text); toast('Copied', 'success'); } catch { toast('Copy failed', 'error'); } }
 
   /* ---------- upload widget ---------- */
-  function uploadBox({ value = '', accept = 'image/*', label = 'Click or drop a file', url = '/api/admin/upload', onDone, secure = false } = {}) {
+  function uploadBox({ value = '', accept = 'image/*', label = 'Click or drop a file', hint = '', url = '/api/admin/upload', onDone, secure = false } = {}) {
     const inputEl = h('input', { type: 'file', accept, class: 'hidden' });
     const bar = h('div', { class: 'progress hidden' }, h('div'));
     const preview = h('div');
@@ -393,6 +393,7 @@
             : h('img', { src: v, alt: '' }));
       } else if (v && secure) preview.append(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text)' } }, iconEl('lock'), name || 'Private video uploaded'));
       else preview.append(iconEl('upload'), h('div', {}, label));
+      if (hint) preview.append(h('div', { class: 'up-hint' }, hint));
     };
     show(value);
     const handle = async (file) => {

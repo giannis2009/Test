@@ -87,7 +87,7 @@
     a = a || { title: '', description: '', cover_url: '', visible: 1, category_id: cat.id };
     const title = input(a.title, { placeholder: 'e.g. Summer Drop 2026', autofocus: true });
     const desc = textarea(a.description, { placeholder: 'Optional — shown on the album page', style: { minHeight: '70px' } });
-    const cover = E.uploadBox({ value: a.cover_url || '', label: 'Cover image (portrait 4:5 looks best)' });
+    const cover = E.uploadBox({ value: a.cover_url || '', label: 'Album cover', hint: 'Square 1:1 · 3000×3000 px (min 1600×1600)' });
     const pick = photos.filter((m) => m.type === 'image').length ? h('div', { class: 'mgrid', style: { gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))' } },
       photos.filter((m) => m.type === 'image').map((m) => h('button', { type: 'button', class: 'mitem', style: { padding: 0, cursor: 'pointer' }, title: 'Use as cover', onclick: () => { cover.set(m.url); toast('Cover set — save to apply'); } }, h('img', { src: m.url, alt: '' })))) : null;
     const catSel = select(categories.map((c) => ({ value: c.id, label: c.name, icon: c.icon })), a.category_id);
@@ -96,10 +96,10 @@
     const song = {
       song_title: input(a.song_title, { placeholder: 'e.g. Midnight' }), artist: input(a.artist, { placeholder: 'e.g. Artist name' }),
       release_date: input(a.release_date, { placeholder: 'e.g. March 2026' }), genre: input(a.genre, { placeholder: 'e.g. Trap, Pop' }),
-      link_url: input(a.link_url, { placeholder: 'Spotify / YouTube / Apple Music link', type: 'url' }),
+      link_url: input(a.link_url, { placeholder: 'https://open.spotify.com/track/…', type: 'url' }),
       credits: textarea(a.credits, { placeholder: 'Credits & info — e.g. Cover art by Ezro · Mixed by …', style: { minHeight: '70px' } }),
     };
-    const audio = E.uploadBox({ value: a.audio_url || '', accept: 'audio/*', label: 'Song / preview (MP3, M4A, WAV)' });
+    const audio = E.uploadBox({ value: a.audio_url || '', accept: 'audio/*', label: 'Song / preview', hint: 'MP3, M4A or WAV · up to 30 s preview' });
     const clearAudio = h('button', { type: 'button', class: 'btn sm', onclick: () => audio.set('') }, 'Remove song');
     const save = h('button', { class: 'btn primary' }, isNew ? 'Create album' : 'Save');
     save.onclick = () => withBusy(save, async () => {
@@ -125,7 +125,7 @@
         h('div', { class: 'row' }, field('Song title', song.song_title), field('Artist', song.artist)),
         h('div', { class: 'row' }, field('Release', song.release_date), field('Genre', song.genre)),
         field('Song file', h('div', { style: { display: 'grid', gap: '8px' } }, audio, clearAudio), 'Visitors can play it on the back of the cover. A 30–60 second preview is enough.'),
-        field('Streaming link', song.link_url), field('Credits & info', song.credits)) });
+        field('Spotify link', song.link_url, 'Paste a Spotify track or album link — it shows as a player on the album page, in the site’s theme.'), field('Credits & info', song.credits)) });
   }
   function editCategory(c) {
     const isNew = !c;
@@ -152,7 +152,7 @@
     const title = input(m.title, { placeholder: 'Title' });
     const caption = textarea(m.caption, { placeholder: 'Caption (optional)', style: { minHeight: '70px' } });
     const cat = select(categories.map((c) => ({ value: c.id, label: c.name, icon: c.icon })), m.category_id);
-    const poster = E.uploadBox({ value: m.poster || '', label: 'Optional poster image for videos' });
+    const poster = E.uploadBox({ value: m.poster || '', label: 'Optional poster image for videos', hint: '1920×1080 px (16:9)' });
     const save = h('button', { class: 'btn primary' }, 'Save');
     save.onclick = () => withBusy(save, async () => {
       try {
@@ -183,8 +183,7 @@
     let ic = so.icon;
     const name = input(so.name, { placeholder: 'Instagram', autofocus: true });
     const url = input(so.url === '#' ? '' : so.url, { placeholder: 'https://instagram.com/yourname', type: 'url' });
-    const custom = E.uploadBox({ value: /^(\/|https?:)/.test(ic) ? ic : '', label: 'Or upload your own icon (SVG / PNG)', onDone: (r) => { ic = r.url; picker.value = ''; } });
-    const picker = A.iconPicker(/^(\/|https?:)/.test(ic) ? '' : ic, (n) => { ic = n; custom.set(''); if (!name.value) name.value = n[0].toUpperCase() + n.slice(1); });
+    const picker = A.iconPicker(ic, (n) => { ic = n; if (!name.value && !/^(\/|https?:)/.test(n)) name.value = n[0].toUpperCase() + n.slice(1); });
     const visible = toggle(!!so.visible, 'Visible');
     const save = h('button', { class: 'btn primary' }, 'Save');
     save.onclick = () => withBusy(save, async () => {
@@ -193,7 +192,7 @@
     const foot = [];
     if (!isNew) foot.push(A.btn('Delete', 'trash', async () => { if (await E.confirmDialog(`Delete ${so.name}?`, '', { ok: 'Delete', danger: true })) { await api(`/api/admin/socials/${so.id}`, { method: 'DELETE' }).catch(fail); s.close(); A.refresh(); } }, 'danger'));
     foot.push(h('div', { class: 'spacer' }), visible, save);
-    const s = sheet({ title: isNew ? 'Add social' : `Edit ${so.name}`, size: 'wide', foot, body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Name', name), field('Link', url)), field('Icon', picker), custom) });
+    const s = sheet({ title: isNew ? 'Add social' : `Edit ${so.name}`, size: 'wide', foot, body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Name', name), field('Link', url)), field('Icon', picker)) });
   }
 
   /* ================= Texts (font + every text on the site) ================= */
@@ -209,9 +208,9 @@
     useFont.onclick = () => A.saveSettings('appearance', { font: fontSel.value }, useFont);
 
     // site details
-    const sd = { name: input(site.name), handle: input(site.handle), tagline: input(site.tagline), bio: textarea(site.bio, { style: { minHeight: '70px' } }), status: input(site.status), showStatus: toggle(site.showStatus, 'Show status pill'), footer: input(site.footer), projectName: input(site.projectName) };
+    const sd = { name: input(site.name), handle: input(site.handle), tagline: input(site.tagline), bio: textarea(site.bio, { style: { minHeight: '70px' } }), footer: input(site.footer), projectName: input(site.projectName) };
     const saveSite = h('button', { class: 'btn primary' }, 'Save details');
-    saveSite.onclick = () => A.saveSettings('site', Object.fromEntries(Object.entries(sd).map(([k, el]) => [k, k === 'showStatus' ? el.checked : el.value])), saveSite);
+    saveSite.onclick = () => A.saveSettings('site', Object.fromEntries(Object.entries(sd).map(([k, el]) => [k, el.value])), saveSite);
 
     // changed texts
     let pageFilter = 'all-pages';
@@ -265,7 +264,7 @@
         A.panel('Edit texts on the page', h('p', { class: 'desc' }, 'Opens the page in edit mode: click any text, then change or delete it and save.'),
           h('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } }, open('/', 'Home'), open('/watch', 'Video Review'))),
         A.panel('Site details', h('div', { class: 'form' }, h('div', { class: 'row' }, field('Name', sd.name), field('Handle', sd.handle), field('Tagline', sd.tagline)), field('Bio', sd.bio),
-          h('div', { class: 'row' }, field('Status text', sd.status), field('Footer text', sd.footer), field('Project name (Tasks & Dashboard)', sd.projectName)), sd.showStatus, h('div', { class: 'form-actions' }, saveSite))),
+          h('div', { class: 'row' }, field('Footer text', sd.footer), field('Project name (Tasks & Dashboard)', sd.projectName)), h('div', { class: 'form-actions' }, saveSite))),
         A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' } }, 'Changed texts', countEl, h('span', { style: { marginLeft: 'auto', display: 'flex', gap: '8px' } }, filterSel, addChange)), listEl))];
   };
 
@@ -285,8 +284,8 @@
     const theme = segmented([['system', 'System', 'settings'], ['dark', 'Dark', 'moon'], ['light', 'Light', 'sun']], st.defaultTheme, (v) => { st.defaultTheme = v; }, { block: true });
     const range = (k, min, max, lbl) => { const r = h('input', { type: 'range', min, max, value: st[k] }); const out = h('span', { class: 'muted' }, `${st[k]}px`); r.oninput = () => { st[k] = Number(r.value); out.textContent = `${r.value}px`; pushPreview(); }; return field(h('span', { style: { display: 'flex', justifyContent: 'space-between' } }, lbl, out), r); };
     const sw2 = (k, lbl) => toggle(st[k], lbl, (on) => { st[k] = on; pushPreview(); });
-    const logo = E.uploadBox({ value: st.logoUrl, label: 'Logo (transparent PNG / WebP / SVG)', onDone: (r) => { st.logoUrl = r.url; } });
-    const fav = E.uploadBox({ value: st.faviconUrl, label: 'Icon / favicon (square)', onDone: (r) => { st.faviconUrl = r.url; } });
+    const logo = E.uploadBox({ value: st.logoUrl, label: 'Logo', hint: 'Transparent PNG / WebP / SVG · ~2000 px wide', onDone: (r) => { st.logoUrl = r.url; } });
+    const fav = E.uploadBox({ value: st.faviconUrl, label: 'Icon / favicon', hint: 'Square PNG · 512×512 px', onDone: (r) => { st.faviconUrl = r.url; } });
     const save = h('button', { class: 'btn primary' }, iconEl('check'), 'Save appearance');
     save.onclick = () => A.saveSettings('appearance', st, save).then((r) => { if (r) frame.src = '/'; });
     const reset = A.btn('Reset colours', 'refresh', () => { st.primary = '#905abd'; st.secondary = '#b491dc'; primary.value = st.primary; secondary.value = st.secondary; drawSw(); pushPreview(); });

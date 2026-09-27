@@ -24,10 +24,29 @@
   Admin.btn = (label, ic, onclick, cls = '') => h('button', { class: `btn ${cls}`, onclick }, ic ? iconEl(ic) : null, label);
   Admin.iconPicker = (value, onPick, { brands = true } = {}) => {
     const names = [...(brands ? E.BRANDS : []), ...E.ICONS];
+    const isUrl = (v) => /^(\/|https?:)/.test(v || '');
+    const wrap = h('div', { class: 'icon-picker' });
     const grid = h('div', { class: 'icon-grid' });
-    const draw = () => grid.replaceChildren(...names.map((n) => h('button', { type: 'button', class: n === grid.value ? 'on' : '', title: n, 'aria-label': n, html: icon(n), onclick: () => { grid.value = n; draw(); onPick?.(n); } })));
-    grid.value = value; draw();
-    return grid;
+    const file = h('input', { type: 'file', accept: 'image/svg+xml,image/png,image/webp', class: 'hidden' });
+    const prev = h('div', { class: 'prev' });
+    const own = h('div', { class: 'icon-own' }, prev,
+      h('div', { class: 'tt' }, h('strong', {}, 'Upload your own icon'), h('span', {}, 'SVG or PNG · square 256×256 px · transparent background')),
+      h('button', { type: 'button', class: 'btn sm' }, iconEl('upload'), 'Choose file'), file);
+    const set = (v) => {
+      wrap.value = v;
+      grid.replaceChildren(...names.map((n) => h('button', { type: 'button', class: n === v ? 'on' : '', title: n, 'aria-label': n, html: icon(n), onclick: () => { set(n); onPick?.(n); } })));
+      own.classList.toggle('on', isUrl(v));
+      prev.replaceChildren(isUrl(v) ? h('img', { src: v, alt: '' }) : iconEl('image'));
+    };
+    own.querySelector('button').onclick = () => file.click();
+    file.onchange = async () => {
+      const f = file.files[0]; file.value = '';
+      if (!f) return;
+      try { const r = await E.upload('/api/admin/upload', f); set(r.url); onPick?.(r.url); toast('Icon uploaded', 'success'); } catch (e) { fail(e); }
+    };
+    set(value);
+    wrap.append(grid, own);
+    return wrap;
   };
   Admin.saveSettings = async (key, data, btn) => {
     const go = async () => { const r = await api(`/api/admin/settings/${key}`, { method: 'PUT', body: data }); toast('Saved', 'success'); return r; };
@@ -261,12 +280,11 @@
     const email = E.input('', { type: 'email', placeholder: 'name@gmail.com' });
     const add = h('button', { class: 'btn primary' }, iconEl('plus'), 'Add admin');
     add.onclick = () => withBusy(add, async () => { try { await api('/api/admin/admins', { body: { email: email.value } }); toast('Admin added', 'success'); Admin.refresh(); } catch (e) { fail(e); } });
-    const wm = E.toggle(sec.watermark, 'Moving watermark with the buyer’s email');
     const blur = E.toggle(sec.blurOnFocusLoss, 'Black out the video when the window loses focus');
     const dev = E.toggle(sec.blockDevtools, 'Black out when developer tools are opened');
     const maxv = E.input(sec.maxViewsPerKey, { type: 'number', min: '0' });
     const save = h('button', { class: 'btn primary' }, 'Save security');
-    save.onclick = () => Admin.saveSettings('security', { watermark: wm.checked, blurOnFocusLoss: blur.checked, blockDevtools: dev.checked, maxViewsPerKey: Number(maxv.value) || 0 }, save);
+    save.onclick = () => Admin.saveSettings('security', { blurOnFocusLoss: blur.checked, blockDevtools: dev.checked, maxViewsPerKey: Number(maxv.value) || 0 }, save);
     return [Admin.head('Admins & Security', 'Who can open this panel, and how paid videos are protected.'),
       h('div', { class: 'page' }, h('div', { class: 'split' },
         Admin.panel('Admins',
@@ -276,7 +294,7 @@
             a.admins.map((x) => h('div', { class: 'lrow' }, h('div', { class: 'ic', html: icon('user') }), h('div', { class: 'tt' }, h('strong', {}, x.email), h('span', {}, `Added ${E.fmtDate(x.added_at)} by ${x.added_by || '—'}`)),
               a.canManage ? h('button', { class: 'btn icon sm ghost danger', 'aria-label': 'Remove', html: icon('trash'), onclick: async () => { if (await E.confirmDialog('Remove admin?', x.email, { ok: 'Remove', danger: true })) { await api(`/api/admin/admins/${encodeURIComponent(x.email)}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); } } }) : null))),
           a.canManage ? h('div', { class: 'input-group', style: { marginTop: '14px' } }, email, add) : null),
-        Admin.panel('Video protection', h('div', { class: 'form' }, wm, blur, dev,
+        Admin.panel('Video protection', h('div', { class: 'form' }, blur, dev,
           E.field('Maximum viewing sessions per key', maxv, '0 = unlimited. A session counts once per 30 minutes.'),
           h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
           h('div', { class: 'form-actions' }, save))))),
@@ -309,10 +327,20 @@
       if (!(await E.confirmDialog('Delete for good?', 'This cannot be undone.', { ok: 'Reset', danger: true }))) return;
       try { await api('/api/admin/reset', { body: { what: [...picked], confirm: 'RESET' } }); toast('Done — data reset', 'success'); Admin.refresh(); } catch (e) { fail(e); }
     });
+    const uEmail = E.input('', { type: 'email', placeholder: 'customer@gmail.com', autocomplete: 'off' });
+    const uGo = h('button', { class: 'btn danger solid' }, iconEl('user'), 'Reset user');
+    uGo.onclick = () => withBusy(uGo, async () => {
+      const em = uEmail.value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { toast('Enter a valid email', 'error'); uEmail.focus(); return; }
+      if (!(await E.confirmDialog(`Reset ${em}?`, 'Deletes their account, profile, orders, redeem codes and sign-ups. They can sign in again as a new customer.', { ok: 'Reset user', danger: true }))) return;
+      try { const r = await api('/api/admin/reset-user', { body: { email: em } }); toast(`Reset — ${r.found.orders} order(s), ${r.found.codes} code(s) removed`, 'success'); uEmail.value = ''; Admin.refresh(); } catch (e) { fail(e); }
+    });
     return [Admin.head('Reset data', 'Start fresh — clear test orders, statistics and logs. Products, albums, texts and settings are never touched.'),
       h('div', { class: 'page' }, canReset
-        ? Admin.panel('Choose what to clear', h('div', { class: 'list' }, rows),
-          h('div', { class: 'input-group', style: { marginTop: '18px', flexWrap: 'wrap' } }, all, h('span', { style: { flex: 1 } }), confirmIn, go))
+        ? [Admin.panel('Reset a user', h('p', { class: 'desc' }, 'Everything for one email: account, photo and name, orders, redeem codes, sessions.'),
+          h('div', { class: 'input-group', style: { flexWrap: 'wrap' } }, uEmail, uGo)),
+        Admin.panel('Choose what to clear', h('div', { class: 'list' }, rows),
+          h('div', { class: 'input-group', style: { marginTop: '18px', flexWrap: 'wrap' } }, all, h('span', { style: { flex: 1 } }), confirmIn, go))]
         : h('div', { class: 'empty' }, iconEl('lock'), 'Only the owner (ADMIN_EMAILS in .env) can reset data.'))];
   };
 

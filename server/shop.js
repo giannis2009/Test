@@ -100,8 +100,8 @@ async function fulfil(order, extra = {}, req = null) {
          payer_email = COALESCE(?, payer_email) WHERE id = ?`, now(), extra.captureId || null, extra.payerEmail || null, order.id);
     for (const it of JSON.parse(fresh.items)) {
       if (get('SELECT 1 FROM licenses WHERE product_id = ? AND revoked = 0 AND (user_id = ? OR email = ?)', it.product_id, fresh.user_id, fresh.email)) continue;
-      run('INSERT INTO licenses (key, order_id, product_id, product_title, user_id, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        licenseKey(), order.id, it.product_id, it.title, fresh.user_id, fresh.email, now());
+      run('INSERT INTO licenses (key, order_id, product_id, product_title, user_id, email, created_at, redeemed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        licenseKey(), order.id, it.product_id, it.title, fresh.user_id, fresh.email, now(), now());
       run('UPDATE products SET stock = stock - 1 WHERE id = ? AND stock IS NOT NULL AND stock > 0', it.product_id);
     }
     if (fresh.discount_code) run('UPDATE discounts SET uses = uses + 1 WHERE code = ? COLLATE NOCASE', fresh.discount_code);

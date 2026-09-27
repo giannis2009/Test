@@ -91,4 +91,30 @@ async function stream(product, req, res) {
   body.pipe(res);
 }
 
-module.exports = { stream, driveConfigured, driveId };
+// Full file as an attachment (for the buyer's download panel).
+async function download(product, res, baseName) {
+  res.setHeader('Cache-Control', 'no-store, private');
+  if (product.video_source === 'upload') {
+    const file = path.join(SECURE_DIR, path.basename(product.video_ref || ''));
+    if (!product.video_ref || !fs.existsSync(file)) { res.status(404).end(); return; }
+    res.download(file, `${baseName}${path.extname(file)}`);
+    return;
+  }
+  if (product.video_source === 'drive') {
+    if (!driveAuth()) { res.status(503).end('Drive not configured'); return; }
+    const id = driveId(product.video_ref);
+    const { size, mime } = await driveMeta(id);
+    const token = await driveAuth().getAccessToken();
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) { res.status(502).end(); return; }
+    const ext = mime.includes('webm') ? '.webm' : mime.includes('quicktime') ? '.mov' : '.mp4';
+    res.setHeader('Content-Type', mime);
+    if (size) res.setHeader('Content-Length', size);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(baseName + ext)}"; filename*=UTF-8''${encodeURIComponent(baseName + ext)}`);
+    Readable.fromWeb(r.body).pipe(res);
+    return;
+  }
+  res.status(404).end();
+}
+
+module.exports = { stream, download, driveConfigured, driveId };

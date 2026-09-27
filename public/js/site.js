@@ -289,13 +289,9 @@
     $('#work').classList.toggle('hidden', hideWork);
     if (!items.length) { g.replaceChildren(albums.length ? '' : h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.')); return; }
     g.replaceChildren(...items.map((m, i) => {
-      const media = m.type === 'video'
-        ? h('video', { src: m.url, poster: m.poster || null, muted: true, loop: true, playsinline: true, preload: 'metadata' })
-        : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
+      const media = m.type === 'video' ? loopVideo(m) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
       const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media,
-        m.type === 'video' ? h('span', { class: 'play-badge', html: icon('play') }) : null,
         m.title ? h('figcaption', { class: 'tile-cap' }, m.title) : null);
-      if (m.type === 'video') { tile.onmouseenter = () => media.play().catch(() => {}); tile.onmouseleave = () => media.pause(); }
       tile.onclick = () => lightbox(items, i);
       tilt(tile);
       tile.onkeydown = (e) => e.key === 'Enter' && lightbox(items, i);
@@ -304,6 +300,16 @@
   }
   // Protected cover: painted as a CSS background under a transparent shield — no <img> to
   // right-click, drag or long-press-save.
+  // Portfolio videos play by themselves as a silent seamless loop while they are on screen.
+  const videoIO = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => {
+    if (e.isIntersecting) e.target.play().catch(() => {}); else e.target.pause();
+  }), { threshold: 0.15 }) : null;
+  function loopVideo(m) {
+    const v = h('video', { src: m.url, poster: m.poster || null, muted: true, loop: true, playsinline: true, autoplay: true, preload: 'auto', disablepictureinpicture: true, 'aria-label': m.title || 'Video' });
+    v.muted = true;
+    videoIO ? videoIO.observe(v) : v.play().catch(() => {});
+    return v;
+  }
   function protectedCover(url, cls = '') {
     return h('div', { class: `pcover ${cls}`, style: url ? { backgroundImage: `url("${url}")` } : {}, role: 'img', 'aria-label': 'Cover art' },
       url ? null : h('div', { class: 'ph', html: icon('image') }), h('span', { class: 'pcover-shield' }));
@@ -312,62 +318,63 @@
   function stopSong() { if (nowPlaying) { nowPlaying.pause(); nowPlaying = null; } }
   const fmtTime = (s) => (Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '0:00');
 
-  // Album card that flips: cover in front, the song and its details on the back.
+  // Cover tile: edge-to-edge in a seamless grid, protected image, clean hover reveal. Opens the album.
   function albumCard(a) {
     const cover = a.cover_url || a.first_url;
     const catName = S.site.categories.find((c) => c.id === a.category_id)?.name;
-    const hasSong = a.song_title || a.artist || a.audio_url;
-    // back side: player
-    let player = null;
-    if (a.audio_url) {
-      const audio = new Audio(); audio.preload = 'none'; audio.src = a.audio_url;
-      const btn = h('button', { type: 'button', class: 'fb-play', 'aria-label': 'Play preview', html: icon('play', 'fill') });
-      const fill = h('span', { class: 'fb-fill' });
-      const bar = h('div', { class: 'fb-bar', role: 'slider', 'aria-label': 'Seek' }, fill);
-      const cur = h('span', {}, '0:00'); const dur = h('span', {}, '');
-      const eq = h('span', { class: 'fb-eq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i'));
-      const setIcon = () => { btn.innerHTML = icon(audio.paused ? 'play' : 'pause', 'fill'); card.classList.toggle('playing', !audio.paused); };
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        if (audio.paused) { if (nowPlaying && nowPlaying !== audio) nowPlaying.pause(); nowPlaying = audio; audio.play().catch(() => toast('Could not play this song', 'error')); }
-        else audio.pause();
-      };
-      audio.addEventListener('play', setIcon); audio.addEventListener('pause', setIcon); audio.addEventListener('ended', setIcon);
-      audio.addEventListener('loadedmetadata', () => { dur.textContent = fmtTime(audio.duration); });
-      audio.addEventListener('timeupdate', () => { fill.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`; cur.textContent = fmtTime(audio.currentTime); });
-      bar.addEventListener('click', (e) => { e.stopPropagation(); const r = bar.getBoundingClientRect(); if (audio.duration) audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration; });
-      player = { el: h('div', { class: 'fb-player' }, btn, h('div', { class: 'fb-track' }, bar, h('div', { class: 'fb-times' }, cur, eq, dur))), audio };
-    }
-    const facts = [['Release', a.release_date], ['Genre', a.genre], ['Category', catName]].filter(([, v]) => v);
-    const back = h('div', { class: 'flip-face flip-back' },
-      h('div', { class: 'fb-bg', style: cover ? { backgroundImage: `url("${cover}")` } : {} }),
-      h('div', { class: 'fb-body' },
-        h('div', { class: 'fb-head' }, protectedCover(cover, 'fb-thumb'),
-          h('div', { class: 'fb-titles' }, h('span', { class: 'fb-kicker' }, hasSong ? 'Now playing' : 'About'),
-            h('strong', {}, a.song_title || a.title), a.artist ? h('span', {}, a.artist) : null)),
-        player ? player.el : null,
-        facts.length ? h('dl', { class: 'fb-facts' }, facts.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, v)))) : null,
-        a.credits || a.description ? h('p', { class: 'fb-credits' }, a.credits || a.description) : null,
-        h('div', { class: 'fb-acts' },
-          a.link_url ? h('a', { class: 'btn sm fb-btn', href: a.link_url, target: '_blank', rel: 'noopener noreferrer', onclick: (e) => e.stopPropagation() }, iconEl(/spotify/i.test(a.link_url) ? 'spotify' : /youtu/i.test(a.link_url) ? 'youtube' : 'external'), 'Listen') : null,
-          h('button', { type: 'button', class: 'btn sm fb-btn primary', onclick: (e) => { e.stopPropagation(); stopSong(); navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' }); } }, 'View album', iconEl('arrow')))));
-    const front = h('div', { class: 'flip-face flip-front' },
+    const card = h('a', { class: 'album', href: `/album/${a.id}`, 'aria-label': a.title },
       protectedCover(cover, 'album-cover'),
+      h('span', { class: 'album-sheen', 'aria-hidden': 'true' }),
       h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, h('strong', {}, a.title),
-        h('span', { class: 'album-open' }, iconEl(hasSong ? 'volume' : 'refresh'), hasSong ? 'Tap to play' : 'Tap for details')),
-      h('span', { class: 'flip-hint', 'aria-hidden': 'true', html: icon('refresh') }));
-    const inner = h('div', { class: 'flip-inner' }, front, back);
-    const card = h('article', { class: 'album flip', tabindex: '0', role: 'button', 'aria-label': `${a.title} — flip for details` }, inner);
-    const flip = (on) => {
-      const v = on ?? !card.classList.contains('flipped');
-      card.classList.toggle('flipped', v);
-      if (!v && player && !player.audio.paused) player.audio.pause();
-    };
-    card.addEventListener('click', () => flip());
-    card.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); flip(); } });
+        a.artist ? h('span', { class: 'album-artist' }, a.artist) : null),
+      h('span', { class: 'album-go', html: icon('arrow-up-right') }));
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      const c = card.querySelector('.album-cover'); if (c) c.style.viewTransitionName = 'product-hero';
+      navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' });
+    });
     card.addEventListener('contextmenu', (e) => e.preventDefault());
     card.addEventListener('dragstart', (e) => e.preventDefault());
     return card;
+  }
+
+  // Song block for the album page: our own preview player + the Spotify embed (follows the site theme).
+  function spotifyEmbed(link) {
+    const m = String(link || '').match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|episode|artist)\/([A-Za-z0-9]+)/);
+    return m ? { type: m[1], id: m[2] } : null;
+  }
+  function songBlock(a) {
+    const kids = [];
+    if (a.audio_url) {
+      const audio = new Audio(); audio.preload = 'metadata'; audio.src = a.audio_url;
+      const btn = h('button', { type: 'button', class: 'sp-play', 'aria-label': 'Play', html: icon('play', 'fill') });
+      const fill = h('span', { class: 'sp-fill' });
+      const bar = h('div', { class: 'sp-bar', role: 'slider', 'aria-label': 'Seek' }, fill);
+      const cur = h('span', {}, '0:00'); const dur = h('span', {}, '0:00');
+      const eq = h('span', { class: 'sp-eq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i'));
+      const wrap = h('div', { class: 'sp-player' });
+      const setIcon = () => { btn.innerHTML = icon(audio.paused ? 'play' : 'pause', 'fill'); wrap.classList.toggle('playing', !audio.paused); };
+      btn.onclick = () => { if (audio.paused) { if (nowPlaying && nowPlaying !== audio) nowPlaying.pause(); nowPlaying = audio; audio.play().catch(() => toast('Could not play this song', 'error')); } else audio.pause(); };
+      ['play', 'pause', 'ended'].forEach((ev) => audio.addEventListener(ev, setIcon));
+      audio.addEventListener('loadedmetadata', () => { dur.textContent = fmtTime(audio.duration); });
+      audio.addEventListener('timeupdate', () => { fill.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`; cur.textContent = fmtTime(audio.currentTime); });
+      bar.addEventListener('click', (e) => { const r = bar.getBoundingClientRect(); if (audio.duration) audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration; });
+      wrap.append(btn, h('div', { class: 'sp-track' }, bar, h('div', { class: 'sp-times' }, cur, eq, dur)));
+      kids.push(wrap);
+    }
+    const sp = spotifyEmbed(a.link_url);
+    if (sp) {
+      const frame = h('iframe', { class: 'sp-embed', title: 'Spotify', loading: 'lazy', allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture', height: sp.type === 'track' ? '152' : '352' });
+      const setSrc = () => { const dark = document.documentElement.dataset.theme !== 'light'; frame.src = `https://open.spotify.com/embed/${sp.type}/${sp.id}?utm_source=generator${dark ? '&theme=0' : ''}`; };
+      setSrc();
+      // re-theme the embed when the site switches dark / light
+      const mo = new MutationObserver(() => { if (!frame.isConnected) { mo.disconnect(); return; } setSrc(); });
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      kids.push(frame);
+    } else if (a.link_url) {
+      kids.push(h('a', { class: 'btn', href: a.link_url, target: '_blank', rel: 'noopener noreferrer' }, iconEl(/youtu/i.test(a.link_url) ? 'youtube' : 'external'), 'Listen'));
+    }
+    return kids.length ? h('div', { class: 'song' }, kids) : null;
   }
   function renderAlbumPage(a) {
     pageCleanup?.();
@@ -384,12 +391,14 @@
       h('header', { class: 'album-hero' },
         cover ? (() => { const c = protectedCover(cover, 'album-hero-cover'); c.style.viewTransitionName = 'product-hero'; c.oncontextmenu = (e) => e.preventDefault(); return c; })() : null,
         h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
-          a.description ? h('p', {}, a.description) : null)),
+          a.song_title || a.artist ? h('p', { class: 'album-song' }, a.song_title ? h('strong', {}, a.song_title) : null, a.song_title && a.artist ? ' — ' : null, a.artist || null) : null,
+          [a.release_date, a.genre].some(Boolean) ? h('div', { class: 'album-facts' }, [a.release_date, a.genre].filter(Boolean).map((t) => h('span', { class: 'chip' }, t))) : null,
+          a.description ? h('p', {}, a.description) : null,
+          a.credits ? h('p', { class: 'album-credits' }, a.credits) : null,
+          songBlock(a))),
       photos.length ? h('div', { class: 'gallery album-grid' }, photos.map((m, i) => {
-        const media = m.type === 'video' ? h('video', { src: m.url, poster: m.poster || null, muted: true, loop: true, playsinline: true, preload: 'metadata' }) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
-        const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media,
-          m.type === 'video' ? h('span', { class: 'play-badge', html: icon('play') }) : null);
-        if (m.type === 'video') { tile.onmouseenter = () => media.play().catch(() => {}); tile.onmouseleave = () => media.pause(); }
+        const media = m.type === 'video' ? loopVideo(m) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
+        const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media);
         tile.onclick = () => lightbox(photos, i);
         tile.onkeydown = (e) => e.key === 'Enter' && lightbox(photos, i);
         tilt(tile);
@@ -769,8 +778,14 @@
         if (!st.method) return;
         if (st.method === 'paypal') {
           if (blocked) { payArea.append(h('p', { class: 'muted', style: { textAlign: 'center', fontSize: '13px' } }, 'Accept the terms to show the PayPal button.')); return; }
-          const slot = h('div', { class: 'paypal-slot' }, h('div', { style: { display: 'grid', placeItems: 'center' } }, h('span', { class: 'spinner' })));
-          payArea.append(slot);
+          // a calm, branded frame around PayPal's own buttons
+          const slot = h('div', { class: 'paypal-slot' }, h('div', { class: 'pp-skel' }, h('span'), h('span')));
+          payArea.append(h('div', { class: 'pp-box' },
+            h('div', { class: 'pp-box-head' }, h('span', { class: 'pp-lock', html: icon('lock') }),
+              h('div', {}, h('strong', {}, 'Secure checkout'), h('span', {}, 'PayPal balance, card or Pay Later')),
+              h('div', { class: 'pp-amount' }, h('span', {}, 'Total'), h('strong', {}, money(q.total_cents)))),
+            slot,
+            h('div', { class: 'pp-box-foot' }, iconEl('shield'), 'Encrypted by PayPal · we never see your card details')));
           renderPayPal(slot);
           return;
         }
@@ -804,7 +819,7 @@
       slot.replaceChildren();
       let orderId = null;
       window.paypal.Buttons({
-        style: { layout: 'vertical', shape: 'pill', color: 'gold', label: 'pay', height: 48 },
+        style: { layout: 'vertical', shape: 'pill', color: document.documentElement.dataset.theme === 'light' ? 'black' : 'white', label: 'pay', height: 48, disableMaxWidth: true },
         createOrder: async () => {
           const r = await api('/api/shop/checkout', { body: { productIds: S.cart, code: S.code, method: 'paypal', acceptTerms: st.terms } }).catch((e) => { fail(e); throw e; });
           orderId = r.order.id;
@@ -812,7 +827,8 @@
           return r.paypalOrderId;
         },
         onApprove: async () => {
-          s.setBody(h('div', { class: 'success' }, h('span', { class: 'spinner', style: { margin: '30px auto' } }), h('p', { class: 'muted' }, 'Confirming your payment with PayPal…')));
+          s.setBody(h('div', { class: 'success pp-confirm' }, h('div', { class: 'pp-ring' }, h('span', { html: icon('lock') })),
+            h('h3', {}, 'Confirming your payment'), h('p', { class: 'muted' }, 'Checking with PayPal that the payment went through — one moment…')));
           s.setFoot([]);
           try { const r = await api('/api/shop/paypal/capture', { body: { orderId } }); done(r.order); }
           catch (e) { fail(e); renderPay(); }

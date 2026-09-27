@@ -38,7 +38,7 @@ app.use(helmet({
       'img-src': ["'self'", 'data:', 'blob:', 'https:'],
       'media-src': ["'self'", 'blob:', 'https:'],
       'connect-src': ["'self'", 'https://accounts.google.com', 'https://*.paypal.com', 'https://*.paypalobjects.com'],
-      'frame-src': ["'self'", 'https://accounts.google.com', 'https://*.paypal.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
+      'frame-src': ["'self'", 'https://open.spotify.com', 'https://accounts.google.com', 'https://*.paypal.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
       'frame-ancestors': ["'self'"],
       'form-action': ["'self'"],
       'upgrade-insecure-requests': process.env.NODE_ENV === 'production' ? [] : null,
@@ -69,7 +69,7 @@ app.use('/api/watch', watch.router);
 app.use('/api/admin', admin.router);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
-app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: false }));
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: false, setHeaders: (res, file) => { if (/\.svg$/i.test(file)) res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox"); } }));
 // No browser caching locally, so every change shows up on a normal refresh.
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'], maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
 app.get('/album/:id', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));

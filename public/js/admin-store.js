@@ -106,15 +106,15 @@
       driveRef: input(p.video_source === 'drive' ? p.video_ref : '', { placeholder: 'Google Drive share link or file ID' }),
     };
     let status = p.status; let source = p.video_source || 'none'; let uploadRef = p.video_source === 'upload' ? p.video_ref : '';
-    const cover = E.uploadBox({ value: p.cover_url || '', label: 'Cover image (16:10 looks best)' });
+    const cover = E.uploadBox({ value: p.cover_url || '', label: 'Cover image', hint: '1600×1200 px (4:3) · JPG / WebP' });
     const gallery = [...(p.gallery || [])];
     const galBox = h('div', { class: 'mgrid' });
     const drawGallery = () => galBox.replaceChildren(...gallery.map((u, i) => h('div', { class: 'mitem', dataset: { u } }, /\.(mp4|webm|mov)$/i.test(u) ? h('video', { src: u, muted: true }) : h('img', { src: u, alt: '' }),
       h('div', { class: 'ov' }, h('div', { class: 'top' }, h('span', { class: 'handle', html: icon('grip') }), h('button', { type: 'button', 'aria-label': 'Remove', html: icon('trash'), onclick: () => { gallery.splice(i, 1); drawGallery(); } }))))),
-    E.uploadBox({ label: 'Add image', onDone: (r) => { gallery.push(r.url); drawGallery(); } }));
+    E.uploadBox({ label: 'Add image', hint: '1920×1200 px', onDone: (r) => { gallery.push(r.url); drawGallery(); } }));
     drawGallery();
     E.dragSort({ containers: [galBox], item: '.mitem', handle: '.handle', onDrop: () => { const order = $$('.mitem', galBox).map((m) => m.dataset.u); gallery.splice(0, gallery.length, ...order); } });
-    const previewUp = E.uploadBox({ accept: 'video/*', label: 'Upload a public preview / trailer video', onDone: (r) => { f.preview.value = r.url; } });
+    const previewUp = E.uploadBox({ accept: 'video/*', label: 'Upload a public preview / trailer video', hint: 'MP4 · 1920×1080 · loops silently', onDone: (r) => { f.preview.value = r.url; } });
 
     const releaseField = field('Release date (countdown)', f.release, 'Optional. Shows a live countdown on the product.');
     const statusSeg = segmented([['active', 'Live', 'check'], ['coming_soon', 'Coming soon', 'clock'], ['hidden', 'Hidden', 'lock']], status, (v) => { status = v; releaseField.classList.toggle('hidden', v !== 'coming_soon'); }, { block: true });
@@ -127,13 +127,49 @@
     const sourceSeg = segmented([['none', 'No video'], ['drive', 'Google Drive', 'globe'], ['upload', 'Upload', 'upload']], source, (v) => { source = v; showSource(); }, { block: true });
     showSource();
 
+    /* ---- download panel: files buyers can download next to the video ---- */
+    const downloads = (p.downloads || []).map((d) => ({ ...d }));
+    const videoDl = toggle(p.video_download !== 0, 'Buyers can also download the video file');
+    const kb = (n) => (n >= 1073741824 ? `${(n / 1073741824).toFixed(1)} GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+    const dlBox = h('div', { class: 'dl-rows' });
+    const drawDl = () => dlBox.replaceChildren(...downloads.map((d, i) => {
+      const nm = input(d.name, { placeholder: 'File name shown to buyers' });
+      nm.oninput = () => { d.name = nm.value; };
+      return h('div', { class: 'dl-row', dataset: { i } }, h('span', { class: 'handle', html: icon('grip') }), iconEl('download'), nm, h('small', {}, d.size ? kb(d.size) : ''),
+        h('button', { type: 'button', class: 'btn icon sm ghost danger', 'aria-label': 'Remove', html: icon('trash'), onclick: () => { downloads.splice(i, 1); drawDl(); } }));
+    }), downloads.length ? '' : h('p', { class: 'muted', style: { fontSize: '13px', margin: 0 } }, 'No extra files yet.'));
+    drawDl();
+    E.dragSort({ containers: [dlBox], item: '.dl-row', handle: '.handle', onDrop: () => { const order = $$('.dl-row', dlBox).map((r) => downloads[Number(r.dataset.i)]); downloads.splice(0, downloads.length, ...order); drawDl(); } });
+    const dlUp = E.uploadBox({ accept: '*/*', secure: true, url: '/api/admin/upload-file', label: 'Add a file — project files, ZIP, PDF, presets…', hint: 'Any file type · up to 4 GB · private', onDone: (r) => { downloads.push({ id: Math.random().toString(36).slice(2, 10), name: r.name, ref: r.ref, size: r.size }); drawDl(); dlUp.set(''); } });
+
+    /* ---- redeem codes (gifts / giveaways) — each works once ---- */
+    const codesBox = h('div', { class: 'code-list' });
+    const loadCodes = async () => {
+      if (isNew) { codesBox.replaceChildren(h('p', { class: 'muted', style: { fontSize: '13px', margin: 0 } }, 'Save the product first, then create codes.')); return; }
+      try {
+        const { codes } = await api(`/api/admin/products/${p.id}/codes`);
+        codesBox.replaceChildren(...codes.map((c) => h('div', { class: 'code-row' }, h('span', { class: 'mono' }, c.key),
+          c.revoked ? h('span', { class: 'chip bad' }, 'Revoked') : c.email ? h('span', { class: 'chip', title: c.email }, `Redeemed · ${c.email}`) : h('span', { class: 'chip good' }, 'Available'),
+          h('button', { type: 'button', class: 'btn icon sm ghost', 'aria-label': 'Copy', html: icon('copy'), onclick: () => E.copy(c.key) }),
+          c.gift && !c.email ? h('button', { type: 'button', class: 'btn icon sm ghost danger', 'aria-label': 'Delete', html: icon('trash'), onclick: async () => { await api(`/api/admin/codes/${c.id}`, { method: 'DELETE' }).catch(fail); loadCodes(); } }) : null)),
+        codes.length ? '' : h('p', { class: 'muted', style: { fontSize: '13px', margin: 0 } }, 'No codes yet.'));
+      } catch (e) { fail(e); }
+    };
+    const codeN = input(1, { type: 'number', min: '1', max: '100', style: { width: '90px' } });
+    const makeCodes = h('button', { type: 'button', class: 'btn' }, iconEl('key'), 'Create codes');
+    makeCodes.onclick = () => withBusy(makeCodes, async () => {
+      if (isNew) { toast('Save the product first', 'error'); return; }
+      try { const r = await api(`/api/admin/products/${p.id}/codes`, { body: { count: Number(codeN.value) || 1 } }); if (r.keys.length === 1) E.copy(r.keys[0]); toast(`${r.keys.length} code(s) created`, 'success'); loadCodes(); } catch (e) { fail(e); }
+    });
+    loadCodes();
+
     const save = h('button', { class: 'btn primary' }, iconEl('check'), isNew ? 'Create product' : 'Save changes');
     save.onclick = () => withBusy(save, async () => {
       const body = {
         title: f.title.value, subtitle: f.subtitle.value, slug: f.slug.value || undefined, category_id: f.category.value, badge: f.badge.value,
         price: f.price.value || 0, compare_price: f.compare.value, stock: f.stock.value, status, release_at: f.release.value || null,
         description: f.description.value, features: f.features.value, tags: f.tags.value, preview_url: f.preview.value, deliver_note: f.deliver.value,
-        cover_url: cover.value, gallery, video_source: source, video_ref: source === 'drive' ? f.driveRef.value : source === 'upload' ? uploadRef : '',
+        cover_url: cover.value, gallery, downloads, video_download: videoDl.checked, video_source: source, video_ref: source === 'drive' ? f.driveRef.value : source === 'upload' ? uploadRef : '',
       };
       if (!body.title.trim()) { toast('Give the product a title', 'error'); f.title.focus(); return; }
       try {
@@ -163,7 +199,9 @@
         h('div', {},
           sec('Images', field('Cover', cover), field('Gallery — drag to reorder', galBox)),
           sec('Public preview', field('Preview video', f.preview), previewUp),
-          sec('Protected delivery', h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '-6px' } }, 'The video buyers unlock with their key on the Video Review page.'), sourceSeg, driveField, upField, field('What the buyer gets', f.deliver)))),
+          sec('Protected delivery', h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '-6px' } }, 'The video buyers unlock with their key on the Video Review page.'), sourceSeg, driveField, upField, field('What the buyer gets', f.deliver)),
+          sec('Download panel', h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '-6px' } }, 'Shown next to the video in the buyer’s profile.'), videoDl, dlBox, dlUp),
+          sec('Redeem codes', h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '-6px' } }, 'Give the product away. Every code unlocks it for one account, once.'), h('div', { class: 'input-group' }, codeN, makeCodes), codesBox))),
     });
   }
 

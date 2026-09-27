@@ -110,7 +110,7 @@ const DEFAULTS = {
   site: {
     name: 'Ezro', handle: '@ezrovfx', tagline: 'VFX & Creative Studio',
     bio: 'Cover art, 3D, branding and VFX — crafted to stand out.',
-    status: 'Open for commissions', showStatus: true, projectName: 'Ezro Studio',
+    projectName: 'Ezro Studio',
     footer: 'All rights reserved.',
   },
   appearance: {
@@ -133,7 +133,7 @@ const DEFAULTS = {
     showTax: true, showKeys: true, showPayer: true, bannerUrl: '',
   },
   shop: { title: 'Shop', subtitle: 'Premium packs, presets and project files.', showSoldOut: true },
-  security: { watermark: true, blurOnFocusLoss: true, maxViewsPerKey: 0, blockDevtools: true },
+  security: { blurOnFocusLoss: true, maxViewsPerKey: 0, blockDevtools: true },
 };
 
 function getSetting(key) {
@@ -181,6 +181,37 @@ db.exec(`CREATE TABLE IF NOT EXISTS albums (
 }
 if (!all('PRAGMA table_info(media)').some((c) => c.name === 'album_id')) {
   db.exec('ALTER TABLE media ADD COLUMN album_id INTEGER REFERENCES albums(id) ON DELETE CASCADE');
+}
+
+// Profile edits (name / photo) that Google sign-in must not overwrite.
+{
+  const cols = all('PRAGMA table_info(users)').map((c) => c.name);
+  if (!cols.includes('name_locked')) db.exec('ALTER TABLE users ADD COLUMN name_locked INTEGER DEFAULT 0');
+  if (!cols.includes('picture_locked')) db.exec('ALTER TABLE users ADD COLUMN picture_locked INTEGER DEFAULT 0');
+}
+// Downloads attached to a product (the buyer gets a download panel next to the video).
+{
+  const cols = all('PRAGMA table_info(products)').map((c) => c.name);
+  if (!cols.includes('downloads')) db.exec("ALTER TABLE products ADD COLUMN downloads TEXT DEFAULT '[]'");
+  if (!cols.includes('video_download')) db.exec('ALTER TABLE products ADD COLUMN video_download INTEGER DEFAULT 1');
+}
+// Redeem codes: a code can exist before anyone owns it (gift codes) and is claimed exactly once.
+if (all('PRAGMA table_info(licenses)').some((c) => c.name === 'email' && c.notnull)) {
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec(`BEGIN;
+    CREATE TABLE licenses_new (
+      id INTEGER PRIMARY KEY, key TEXT UNIQUE NOT NULL, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE SET NULL, product_title TEXT, user_id INTEGER, email TEXT,
+      created_at INTEGER NOT NULL, revoked INTEGER DEFAULT 0, views INTEGER DEFAULT 0, last_view_at INTEGER,
+      gift INTEGER DEFAULT 0, redeemed_at INTEGER
+    );
+    INSERT INTO licenses_new (id, key, order_id, product_id, product_title, user_id, email, created_at, revoked, views, last_view_at, redeemed_at)
+      SELECT id, key, order_id, product_id, product_title, user_id, email, created_at, revoked, views, last_view_at, created_at FROM licenses;
+    DROP TABLE licenses;
+    ALTER TABLE licenses_new RENAME TO licenses;
+    CREATE INDEX IF NOT EXISTS idx_licenses_email ON licenses(email);
+    COMMIT;`);
+  db.exec('PRAGMA foreign_keys = ON');
 }
 
 seed();

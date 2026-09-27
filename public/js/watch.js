@@ -54,7 +54,7 @@
   function keyEntry() {
     const boxes = [0, 1, 2, 3].map(() => h('input', { maxlength: '4', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', inputmode: 'text', 'aria-label': 'Key part' }));
     const keyin = h('div', { class: 'keyin' }, h('span', { class: 'pre' }, 'EZRO'), ...boxes.flatMap((b) => [h('span', { class: 'dash' }, '–'), b]));
-    const unlock = h('button', { class: 'btn primary lg block', style: { marginTop: '18px' } }, iconEl('key'), 'Unlock video');
+    const unlock = h('button', { class: 'btn primary lg block', style: { marginTop: '18px' } }, iconEl('key'), 'Redeem');
     const fillFrom = (text, start = 0) => {
       const chars = text.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^EZRO/, '');
       let i = start; let s = chars;
@@ -77,7 +77,7 @@
       b.addEventListener('paste', (e) => { e.preventDefault(); fillFrom(e.clipboardData.getData('text'), i); });
     });
     const shake = () => { keyin.classList.remove('shake'); void keyin.offsetWidth; keyin.classList.add('shake'); };
-    const el = h('div', {}, keyin, unlock, h('p', { class: 'protect-note' }, iconEl('shield'), `Works only with ${auth.user.email}`));
+    const el = h('div', {}, keyin, unlock, h('p', { class: 'protect-note' }, iconEl('shield'), 'Each code can be redeemed once — it is added to this account for good.'));
     return { el, boxes, unlock, shake };
   }
   function redeemSheet() {
@@ -88,10 +88,14 @@
         h('p', { class: 'muted', style: { marginTop: '6px' } }, 'Enter a redeem code you received.')), k.el],
     });
     k.unlock.onclick = () => withBusy(k.unlock, async () => {
-      if (k.boxes.some((b) => b.value.length !== 4)) { k.shake(); toast('Enter the full key', 'error'); return; }
+      if (k.boxes.some((b) => b.value.length !== 4)) { k.shake(); toast('Enter the full code', 'error'); return; }
       const key = `EZRO-${k.boxes.map((b) => b.value).join('-')}`;
-      try { const sess = await api('/api/watch/open', { body: { key } }); s.close(); play(sess, { key }); }
-      catch (e) { k.shake(); fail(e); }
+      try {
+        const r = await api('/api/watch/redeem', { body: { key } });
+        s.close();
+        toast(r.status === 'redeemed' ? `${r.title} added to your profile` : 'This code is already in your profile', 'success');
+        renderLibrary(r.licenseId);
+      } catch (e) { k.shake(); fail(e); }
     });
     setTimeout(() => k.boxes[0].focus(), 250);
   }
@@ -99,12 +103,14 @@
   /* ---------- library ---------- */
   const money = (c, cur) => (c == null ? '' : E.money(c, cur));
   const lib = { items: [], q: '', filter: 'all', sort: 'recent' };
-  async function renderLibrary() {
+  async function renderLibrary(highlightLicense) {
     const highlight = params.get('order');
     const first = (auth.user.name || auth.user.email).split(/[\s@]/)[0];
+    const avatarBtn = h('button', { class: 'lb-avatar', 'aria-label': 'Edit profile', title: 'Edit profile', onclick: profileSheet }, E.avatarEl(auth.user, 64), h('span', { html: icon('edit') }));
     const head = h('header', { class: 'lb-head' },
-      h('div', { class: 'lb-hello' }, E.avatarEl(auth.user, 52),
-        h('div', {}, h('p', { class: 'eyebrow' }, 'Your profile'), h('h1', {}, `Welcome back, ${first}`))),
+      h('div', { class: 'lb-hello' }, avatarBtn,
+        h('div', {}, h('p', { class: 'eyebrow' }, 'Your profile'), h('h1', {}, `Welcome back, ${first}`),
+          h('button', { class: 'lb-edit', onclick: profileSheet }, auth.user.email, ' · ', h('span', {}, 'Edit profile')))),
       h('div', { class: 'lb-head-acts' },
         h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a code'),
         h('a', { class: 'btn lg primary', href: '/#shop' }, iconEl('bag'), 'Shop')));
@@ -158,7 +164,7 @@
       E.select([['recent', 'Newest first'], ['watched', 'Recently watched'], ['az', 'A → Z']], lib.sort, { onChange: (v) => { lib.sort = v; draw(); }, cls: 'sm' })));
 
     function card(it, i) {
-      const isNew = highlight && it.order_number === highlight;
+      const isNew = (highlight && it.order_number === highlight) || it.id === highlightLicense;
       const keyTxt = h('span', { class: 'mono' }, it.key);
       let revealed = false;
       const eye = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Show code', title: 'Show code', html: icon('eye') });
@@ -183,7 +189,8 @@
             h('div', { class: 'lb-meta' }, h('span', {}, E.fmtDate(it.created_at)), it.order_number ? h('span', {}, `#${it.order_number}`) : null,
               it.total_cents != null ? h('span', {}, money(it.total_cents, it.currency)) : null),
             h('div', { class: 'lb-acts' },
-              it.hasVideo ? h('button', { class: 'btn sm primary', onclick: () => open(it) }, iconEl('play', 'fill'), 'Watch') : h('span', { class: 'chip' }, 'No video')))));
+              it.hasVideo ? h('button', { class: 'btn sm primary', onclick: () => open(it) }, iconEl('play', 'fill'), 'Watch')
+                : it.files ? h('button', { class: 'btn sm primary', onclick: () => open(it) }, iconEl('download'), 'Downloads') : h('span', { class: 'chip' }, 'Nothing to open yet')))));
       return E.reveal(el, (i % 6) * 60);
     }
     function draw() {
@@ -196,11 +203,53 @@
       grid.replaceChildren(...(list.length ? list.map(card) : [h('div', { class: 'empty', style: { gridColumn: '1/-1' } }, iconEl('search'), 'Nothing matches your search.')]));
     }
     draw();
-    if (highlight) setTimeout(() => $('.lb-card.is-new')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+    if (highlight || highlightLicense) setTimeout(() => $('.lb-card.is-new')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
   }
   async function open(it) {
-    if (!it.hasVideo) { toast('This purchase has no video attached yet.'); return; }
+    if (!it.hasVideo && !it.files) { toast('Nothing is attached to this purchase yet.'); return; }
     try { play(await api('/api/watch/open', { body: { licenseId: it.id } }), { licenseId: it.id }); } catch (e) { fail(e); }
+  }
+
+  /* ---------- edit profile: photo + name ---------- */
+  function profileSheet() {
+    const u = auth.user;
+    const preview = h('div', { class: 'pf-avatar' }, E.avatarEl(u, 96));
+    const fileIn = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', class: 'hidden' });
+    const bar = h('div', { class: 'progress hidden' }, h('div'));
+    const pick = h('button', { class: 'btn' }, iconEl('upload'), 'Upload photo');
+    const remove = h('button', { class: 'btn ghost danger' }, 'Remove');
+    const name = E.input(u.name || '', { maxlength: '40', placeholder: 'Your name', autocomplete: 'name' });
+    const save = h('button', { class: 'btn primary' }, 'Save');
+    let changed = false;
+    pick.onclick = () => fileIn.click();
+    fileIn.onchange = async () => {
+      const f = fileIn.files[0]; if (!f) return;
+      if (f.size > 5 * 1024 * 1024) { toast('Max 5 MB', 'error'); return; }
+      bar.classList.remove('hidden');
+      try {
+        const r = await E.upload('/api/auth/avatar', f, (x) => { bar.firstChild.style.width = `${x * 100}%`; });
+        u.picture = r.url; preview.replaceChildren(E.avatarEl(u, 96)); changed = true; toast('Photo updated', 'success');
+      } catch (e) { fail(e); } finally { bar.classList.add('hidden'); fileIn.value = ''; }
+    };
+    remove.onclick = () => withBusy(remove, async () => {
+      try { await api('/api/auth/avatar', { method: 'DELETE' }); u.picture = ''; preview.replaceChildren(E.avatarEl(u, 96)); changed = true; } catch (e) { fail(e); }
+    });
+    save.onclick = () => withBusy(save, async () => {
+      try {
+        if (name.value.trim() !== (u.name || '')) { const r = await api('/api/auth/profile', { method: 'PUT', body: { name: name.value } }); u.name = r.name; changed = true; }
+        s.close(); toast('Profile saved', 'success');
+      } catch (e) { fail(e); }
+    });
+    name.onkeydown = (e) => { if (e.key === 'Enter') save.click(); };
+    const s = E.sheet({
+      title: 'Edit profile', foot: [h('button', { class: 'btn', onclick: () => s.close() }, 'Cancel'), save],
+      onClose: () => { if (changed) { renderNav(); renderLibrary(); } },
+      body: h('div', { class: 'form' },
+        h('div', { class: 'pf-photo' }, preview, h('div', { style: { display: 'grid', gap: '8px' } }, h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, pick, u.picture ? remove : null),
+          h('span', { class: 'muted', style: { fontSize: '12.5px' } }, 'Square image, at least 400 × 400 px · PNG, JPG or WebP · max 5 MB'), bar, fileIn)),
+        E.field('Name', name, 'Shown on your profile.'),
+        E.field('Email', E.input(u.email, { disabled: true }), 'Your Google account — used for purchases and codes.')),
+    });
   }
 
   /* ---------- protected player ---------- */
@@ -210,9 +259,7 @@
       playsinline: true, preload: 'metadata', controlslist: 'nodownload noplaybackrate noremoteplayback',
       disablepictureinpicture: true, disableremoteplayback: true, 'x-webkit-airplay': 'deny',
     });
-    video.src = `/api/watch/stream/${sess.token}`;
-    const wm = sess.watermark ? h('div', { class: 'wm' }, sess.watermark) : null;
-    const wmTile = sess.watermark ? h('div', { class: 'wm-tile' }, Array.from({ length: 40 }, () => h('span', {}, sess.watermark))) : null;
+    if (sess.token) video.src = `/api/watch/stream/${sess.token}`;
     const shield = h('div', { class: 'shield' }, iconEl('shield'), h('strong', {}, 'Protected content'), h('span', { style: { fontSize: '13px', opacity: .7 } }, 'Click to continue watching'));
     const bigBtn = h('div', { class: 'big', html: icon('play') });
     const center = h('div', { class: 'p-center' }, bigBtn);
@@ -224,13 +271,31 @@
     const vol = h('input', { type: 'range', min: '0', max: '1', step: '0.05', value: '1', class: 'p-vol', 'aria-label': 'Volume' });
     const fsBtn = h('button', { 'aria-label': 'Fullscreen', html: icon('fullscreen') });
     const controls = h('div', { class: 'p-controls' }, playBtn, bar, time, muteBtn, vol, fsBtn);
-    const player = h('div', { class: 'player', tabindex: '0' }, video, wmTile, wm, center, controls, shield);
+    const player = h('div', { class: 'player', tabindex: '0' }, video, center, controls, shield);
+
+    // download panel: the video (if allowed) + every file attached to the product
+    const files = sess.downloads || [];
+    const fmtSize = (b) => (!b ? '' : b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+    const url = (f) => `/api/watch/download/${sess.licenseId}/${encodeURIComponent(f.id)}`;
+    const fileIcon = (f) => (f.kind === 'video' ? 'film' : /\.(zip|rar|7z)$/i.test(f.name) ? 'box' : /\.(png|jpe?g|psd|webp|gif)$/i.test(f.name) ? 'image' : /\.(mp3|wav|m4a)$/i.test(f.name) ? 'volume' : 'invoice');
+    const dlAll = h('button', { class: 'btn primary block' }, iconEl('download'), files.length > 1 ? `Download all (${files.length})` : 'Download');
+    dlAll.onclick = () => {
+      files.forEach((f, i) => setTimeout(() => { const a = h('a', { href: url(f), download: '' }); document.body.append(a); a.click(); a.remove(); }, i * 900));
+      toast(files.length > 1 ? 'Downloads started — your browser may ask to allow multiple files' : 'Download started', 'success', 4000);
+    };
+    const panel = files.length ? h('aside', { class: 'dl-panel' },
+      h('div', { class: 'dl-head' }, h('span', { class: 'dl-ic', html: icon('download') }), h('div', {}, h('strong', {}, 'Downloads'), h('span', {}, `${files.length} file${files.length > 1 ? 's' : ''} included`))),
+      sess.deliver_note ? h('p', { class: 'dl-note' }, sess.deliver_note) : null,
+      h('div', { class: 'dl-list' }, files.map((f) => h('a', { class: 'dl-item', href: url(f), download: '' },
+        h('span', { class: 'dl-fi', html: icon(fileIcon(f)) }), h('span', { class: 'dl-t' }, h('strong', {}, f.name), h('span', {}, f.kind === 'video' ? 'Full-quality video' : fmtSize(f.size))),
+        h('span', { class: 'dl-go', html: icon('download') })))),
+      dlAll) : null;
 
     app.replaceChildren(h('div', { class: 'player-page' },
       h('div', { class: 'player-top' }, h('button', { class: 'btn icon', 'aria-label': 'Back', html: icon('chevron-left'), onclick: () => route() }),
         h('div', { style: { flex: 1 } }, h('h2', {}, sess.title), sess.subtitle ? h('p', { class: 'muted' }, sess.subtitle) : null)),
-      player,
-      h('p', { class: 'protect-note' }, iconEl('shield'), 'Private stream · licensed to your account · recording and sharing are not allowed')));
+      h('div', { class: `player-layout ${panel ? 'has-panel' : ''} ${sess.token ? '' : 'no-video'}` },
+        sess.token ? player : null, panel)));
 
     const fmt = (s) => { if (!Number.isFinite(s)) return '0:00'; s = Math.floor(s); const m = Math.floor(s / 60); const hh = Math.floor(m / 60); return `${hh ? `${hh}:${String(m % 60).padStart(2, '0')}` : m}:${String(s % 60).padStart(2, '0')}`; };
     const setPlayIcon = () => {
@@ -266,12 +331,6 @@
     const wake = () => { player.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => player.classList.add('idle'), 2600); };
     player.addEventListener('pointermove', wake); wake();
 
-    // moving watermark (identifies the buyer on any leaked copy)
-    let wmT;
-    if (wm) {
-      const moveWm = () => { wm.style.left = `${5 + Math.random() * 70}%`; wm.style.top = `${6 + Math.random() * 78}%`; };
-      moveWm(); wmT = setInterval(moveWm, 4000);
-    }
 
     // expired token / network error → fetch a fresh token and resume where we were
     let retrying = false;
@@ -279,7 +338,7 @@
       if (retrying) return; retrying = true;
       const t = video.currentTime; const wasPlaying = !video.paused;
       try {
-        const s2 = await api('/api/watch/open', { body: ref.licenseId ? { licenseId: ref.licenseId } : { key: ref.key } });
+        const s2 = await api('/api/watch/open', { body: { licenseId: ref.licenseId } });
         video.src = `/api/watch/stream/${s2.token}`;
         video.currentTime = t; if (wasPlaying) video.play().catch(() => {});
       } catch (e) { fail(e); }
@@ -287,8 +346,7 @@
     });
 
     /* ---- capture deterrents ----
-       Browsers cannot fully stop screen recording; these block the easy paths and the watermark
-       makes any leak traceable. True black-screen-on-record needs DRM (see README). */
+       Browsers cannot fully stop screen recording; these block the easy paths. True black-screen-on-record needs DRM (see README). */
     const sec = sess.security || {};
     const hide = () => { shield.classList.add('on'); video.pause(); };
     const onVis = () => { if (document.hidden) hide(); };
@@ -315,7 +373,7 @@
 
     teardown = () => {
       video.pause(); video.removeAttribute('src'); video.load();
-      clearInterval(wmT); clearInterval(devT); clearTimeout(idleT);
+      clearInterval(devT); clearTimeout(idleT);
       document.removeEventListener('visibilitychange', onVis); window.removeEventListener('blur', onBlur);
       document.removeEventListener('keydown', onKey, true); document.removeEventListener('keyup', onKeyUp, true);
       document.removeEventListener('contextmenu', block); document.removeEventListener('dragstart', block);

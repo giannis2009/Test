@@ -11,31 +11,32 @@ Portfolio, shop, secure video delivery and a full admin panel for **Ezro**.
 | Σελίδα | Τι κάνει |
 |---|---|
 | `/` | Logo, socials, portfolio ανά κατηγορία (COVER ART, 3D ART, BRANDING, PRODUCTS), shop, καλάθι και checkout |
-| `/watch` | **Video Review**: ο πελάτης βάζει το key του και βλέπει το video με προστασία |
+| `/watch` | **Profile**: φωτογραφία και όνομα, τα προϊόντα του πελάτη, video και Download panel |
 | `/admin` | Admin Panel |
 
 **Αγορά, βήμα προς βήμα:**
 1. Ο πελάτης κάνει login με Google.
 2. Πληρώνει με PayPal ή με δική σου μέθοδο πληρωμής.
 3. Ο server επιβεβαιώνει στο PayPal ότι μπήκε το **ακριβές ποσό**.
-4. Δημιουργείται προσωπικό key (`EZRO-XXXX-XXXX-XXXX-XXXX`).
-5. Στέλνεται αναλυτικό invoice email.
-6. Ο πελάτης βλέπει το video στο `/watch`.
+4. Δημιουργείται redeem code (`EZRO-XXXX-XXXX-XXXX-XXXX`) που μπαίνει στο profile του.
+5. Ο πελάτης βλέπει το video και κατεβάζει τα αρχεία από το `/watch`.
+
+Κάθε προϊόν αγοράζεται **μία φορά** ανά λογαριασμό, και κάθε code γίνεται redeem **μία φορά**.
 
 **Admin Panel:**
 - **Dashboard:** επισκέπτες, παραγγελίες, έσοδα, γραφήματα, πρόσφατη δραστηριότητα.
-- **Orders:** επιβεβαίωση πληρωμής, αποστολή invoice ξανά, refund, ανάκληση keys.
-- **Products:** όλα τα πεδία, Live / Coming soon (με countdown και «Notify me») / Hidden, απόθεμα, gallery, preview video, Google Drive ή upload για το προστατευμένο video.
+- **Orders:** επιβεβαίωση πληρωμής, refund, ανάκληση keys.
+- **Products:** όλα τα πεδία, Live / Coming soon (με countdown και «Notify me») / Hidden, απόθεμα, gallery, preview video, Google Drive ή upload για το προστατευμένο video, Download panel με αρχεία, redeem codes για δώρα.
 - **Discounts:** κωδικοί σε ποσοστό ή σταθερό ποσό, όριο χρήσεων, ημερομηνίες, συγκεκριμένα προϊόντα.
 - **Payments & Checkout:** PayPal, δικές σου μέθοδοι πληρωμής με οδηγίες και εικονίδιο, νόμισμα, ΦΠΑ, όροι, κείμενα.
-- **Invoice:** logo, banner, στοιχεία, κείμενα, χρώμα, αρίθμηση, live preview, test email.
 - **Categories & Media:** προσθήκη, αλλαγή και αφαίρεση κατηγοριών, upload εικόνων και video, σειρά με drag.
-- **Social media:** προσθήκη και αλλαγή, εικονίδια ή δικό σου εικονίδιο, σειρά με drag.
+- **Social media:** προσθήκη και αλλαγή, εικονίδια ή upload δικού σου (256×256), σειρά με drag.
 - **Texts:** γραμματοσειρά, αλλαγή ή διαγραφή **οποιουδήποτε** κειμένου (και με κλικ πάνω στη σελίδα).
 - **Appearance:** χρώματα, θέμα, στρογγυλάδα, logo, favicon, με live preview.
 - **Tasks:** board με drag & drop, προτεραιότητες, deadlines, ανάθεση, ορατότητα.
 - **Customers**, **Admins & Security**.
 - **Logs:** κάθε αλλαγή, πληρωμή, login και προβολή video.
+- **Reset data:** καθαρισμός logs, στατιστικών, παραγγελιών, ή **Reset User** με email.
 
 ## Εκκίνηση
 
@@ -76,13 +77,12 @@ npm start                # http://localhost:3000
 - **Key δεμένο στον λογαριασμό:** δουλεύει **μόνο** με τον Google λογαριασμό του αγοραστή. Αν το δώσει σε άλλον, δεν ανοίγει και γράφεται στα Logs.
 - **Προσωρινό stream link:** λήγει και είναι δεμένο στο συγκεκριμένο login. Αν το ανοίξεις απευθείας σε νέα καρτέλα, δίνει 403.
 - **Κρυφή πηγή:** δεν υπάρχει δημόσιο link του Drive, και τα uploads μένουν έξω από τον δημόσιο φάκελο.
-- **Watermark:** το email του αγοραστή μετακινείται πάνω στο video. Αν διαρρεύσει, ξέρεις ποιος το έκανε.
 - **Μαύρη οθόνη όταν:**
   - αλλάζει παράθυρο ή καρτέλα,
   - πατάει PrintScreen ή τα shortcuts για screenshot,
   - ανοίγει τα DevTools,
   - πάει να εκτυπώσει.
-- **Χωρίς κατέβασμα:** χωρίς κουμπί download, δεξί κλικ, Picture-in-Picture ή AirPlay.
+- **Κατέβασμα μόνο από το Download panel:** τα αρχεία δίνονται μόνο στον αγοραστή (και το video, αν το επιτρέψεις στο προϊόν).
 - **Όριο προβολών:** προαιρετικό, ανά key.
 
 **Τι ΔΕΝ μπορεί να γίνει μόνο με κώδικα:** κανένα site δεν μπορεί να κάνει 100% μαύρη την οθόνη σε **κάθε** πρόγραμμα καταγραφής, ή να κάνει ένα αρχείο που κατέβηκε «να μην παίζει πουθενά». Αυτό το πετυχαίνει μόνο το **DRM** (Widevine και FairPlay), όπως στο Netflix. Αν το θέλεις σε αυτό το επίπεδο, το επόμενο βήμα είναι να φιλοξενούνται τα videos σε υπηρεσία με DRM (π.χ. VdoCipher ή Bunny Stream DRM) και να αντικατασταθεί ο player στο `/watch`. Όλα τα υπόλοιπα (keys, login, πληρωμές) μένουν ίδια.

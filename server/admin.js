@@ -9,7 +9,7 @@ const { fulfil } = require('./shop');
 const { send, smtpConfigured } = require('./mailer');
 const paypal = require('./paypal');
 const video = require('./video');
-const { log, str, int, bool, cents, slugify, safeUrl, hex, money, HttpError, wrap } = require('./util');
+const { log, str, int, bool, cents, slugify, safeUrl, hex, money, licenseKey, HttpError, wrap } = require('./util');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -39,6 +39,13 @@ router.post('/upload', publicUpload.single('file'), (req, res) => {
   if (!req.file) throw new HttpError(400, 'No file.');
   log(req, 'upload', req.file.originalname);
   res.json({ url: `/uploads/${req.file.filename}`, type: VID.test(req.file.filename) ? 'video' : AUD.test(req.file.filename) ? 'audio' : 'image' });
+});
+// Any file for a product's download panel (zip, psd, aep, pdf, …) — private, only buyers can download it.
+const fileUpload = multer({ storage: storage(SECURE_DIR), limits: { fileSize: 4 * 1024 * 1024 * 1024 } });
+router.post('/upload-file', fileUpload.single('file'), (req, res) => {
+  if (!req.file) throw new HttpError(400, 'No file.');
+  log(req, 'upload.download_file', req.file.originalname);
+  res.json({ ref: req.file.filename, name: req.file.originalname, size: req.file.size });
 });
 router.post('/upload-secure', secureUpload.single('file'), (req, res) => {
   if (!req.file) throw new HttpError(400, 'No file.');
@@ -132,7 +139,7 @@ router.post('/categories', (req, res) => {
   if (get('SELECT 1 FROM categories WHERE slug = ?', slug)) slug = `${slug}-${Date.now() % 10000}`;
   const sort = get('SELECT COALESCE(MAX(sort), -1) + 1 s FROM categories').s;
   const r = run('INSERT INTO categories (name, slug, icon, description, sort, visible, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    name, slug, str(req.body?.icon, 40) || 'sparkles', str(req.body?.description, 500), sort, req.body?.visible === false ? 0 : 1, now());
+    name, slug, str(req.body?.icon, 300) || 'sparkles', str(req.body?.description, 500), sort, req.body?.visible === false ? 0 : 1, now());
   log(req, 'category.add', name);
   res.json({ id: Number(r.lastInsertRowid) });
 });
@@ -141,7 +148,7 @@ router.put('/categories/:id', (req, res) => {
   if (!c) throw new HttpError(404, 'Not found');
   const b = req.body || {};
   run('UPDATE categories SET name = ?, slug = ?, icon = ?, description = ?, visible = ? WHERE id = ?',
-    str(b.name ?? c.name, 60) || c.name, b.slug ? slugify(b.slug) : c.slug, str(b.icon ?? c.icon, 40), str(b.description ?? c.description, 500),
+    str(b.name ?? c.name, 60) || c.name, b.slug ? slugify(b.slug) : c.slug, str(b.icon ?? c.icon, 300), str(b.description ?? c.description, 500),
     b.visible === undefined ? c.visible : bool(b.visible) ? 1 : 0, c.id);
   log(req, 'category.update', c.name, b.name && b.name !== c.name ? `renamed to ${b.name}` : '');
   res.json({ ok: true });
@@ -278,12 +285,16 @@ function productFromBody(b, existing = {}) {
     video_source: pick('video_source', (v) => (['none', 'drive', 'upload'].includes(v) ? v : 'none'), 'none'),
     video_ref: pick('video_ref', (v) => str(v, 500), ''),
     deliver_note: pick('deliver_note', (v) => str(v, 1000), ''),
+    downloads: b.downloads === undefined ? existing.downloads ?? '[]' : JSON.stringify((Array.isArray(b.downloads) ? b.downloads : []).slice(0, 50)
+      .map((f) => ({ id: str(f.id, 40) || crypto.randomBytes(6).toString('hex'), name: str(f.name, 160) || 'File', ref: path.basename(str(f.ref, 200)), size: Number(f.size) || 0 }))
+      .filter((f) => f.ref)),
+    video_download: b.video_download === undefined ? existing.video_download ?? 1 : bool(b.video_download) ? 1 : 0,
   };
 }
 router.get('/products', (_req, res) => res.json({
   products: all(`SELECT p.*, (SELECT COUNT(*) FROM licenses l WHERE l.product_id = p.id) sold,
     (SELECT COUNT(*) FROM product_notify n WHERE n.product_id = p.id) waiting FROM products p ORDER BY sort, id`)
-    .map((p) => ({ ...p, gallery: J(p.gallery, []), features: J(p.features, []), tags: J(p.tags, []) })),
+    .map((p) => ({ ...p, gallery: J(p.gallery, []), features: J(p.features, []), tags: J(p.tags, []), downloads: J(p.downloads, []) })),
 }));
 router.post('/products', (req, res) => {
   const p = productFromBody(req.body || {});
@@ -316,6 +327,27 @@ router.delete('/products/:id', (req, res) => {
   log(req, 'product.remove', ex.title);
   res.json({ ok: true });
 });
+/* ---------- redeem codes for a product (gifts, giveaways) — each can be redeemed once ---------- */
+router.get('/products/:id/codes', (req, res) => res.json({
+  codes: all('SELECT id, key, email, redeemed_at, created_at, revoked, gift FROM licenses WHERE product_id = ? ORDER BY created_at DESC LIMIT 500', int(req.params.id)),
+}));
+router.post('/products/:id/codes', (req, res) => {
+  const p = get('SELECT id, title FROM products WHERE id = ?', int(req.params.id));
+  if (!p) throw new HttpError(404, 'Not found');
+  const n = Math.min(100, Math.max(1, int(req.body?.count, 1)));
+  const keys = [];
+  tx(() => { for (let i = 0; i < n; i++) { const k = licenseKey(); run('INSERT INTO licenses (key, product_id, product_title, created_at, gift) VALUES (?, ?, ?, ?, 1)', k, p.id, p.title, now()); keys.push(k); } });
+  log(req, 'license.codes_created', p.title, `${n} code(s)`);
+  res.json({ keys });
+});
+router.delete('/codes/:id', (req, res) => {
+  const l = get('SELECT * FROM licenses WHERE id = ? AND gift = 1 AND email IS NULL', int(req.params.id));
+  if (!l) throw new HttpError(400, 'Only unused gift codes can be deleted.');
+  run('DELETE FROM licenses WHERE id = ?', l.id);
+  log(req, 'license.code_deleted', l.key);
+  res.json({ ok: true });
+});
+
 function notifyLaunch(id, title, slug) {
   const { PUBLIC_URL } = require('./mailer');
   const site = getSetting('site');
@@ -418,7 +450,7 @@ router.get('/payment-methods', (_req, res) => res.json({
 }));
 function pmFromBody(b, ex = {}) {
   return {
-    name: str(b.name ?? ex.name, 60), icon: str(b.icon ?? ex.icon, 40) || 'bank', description: str(b.description ?? ex.description, 200),
+    name: str(b.name ?? ex.name, 60), icon: str(b.icon ?? ex.icon, 300) || 'bank', description: str(b.description ?? ex.description, 200),
     instructions: str(b.instructions ?? ex.instructions, 4000), enabled: (b.enabled === undefined ? ex.enabled ?? 1 : bool(b.enabled)) ? 1 : 0,
   };
 }
@@ -571,6 +603,25 @@ const RESETS = {
   tasks: { label: 'Tasks', run: () => run('DELETE FROM tasks') },
   notify: { label: '“Notify me” sign-ups', run: () => run('DELETE FROM product_notify') },
 };
+// Reset one person by email: their account, sessions, orders, codes and notify sign-ups.
+router.post('/reset-user', (req, res) => {
+  if (!isOwner(req.user.email)) throw new HttpError(403, 'Only the owner can reset users.');
+  const email = str(req.body?.email, 200).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Enter a valid email.');
+  if (isOwner(email)) throw new HttpError(400, 'The owner account cannot be reset.');
+  const u = get('SELECT id FROM users WHERE email = ?', email);
+  const found = { orders: get('SELECT COUNT(*) n FROM orders WHERE email = ?', email).n, codes: get('SELECT COUNT(*) n FROM licenses WHERE email = ?', email).n, account: !!u };
+  if (!found.account && !found.orders && !found.codes) throw new HttpError(404, 'No data found for this email.');
+  tx(() => {
+    run('DELETE FROM licenses WHERE email = ?', email);
+    run('DELETE FROM orders WHERE email = ?', email);
+    run('DELETE FROM product_notify WHERE email = ?', email);
+    run('DELETE FROM admins WHERE email = ?', email);
+    if (u) { run('DELETE FROM sessions WHERE user_id = ?', u.id); run('DELETE FROM users WHERE id = ?', u.id); }
+  });
+  log(req, 'admin.reset_user', email, found);
+  res.json({ ok: true, found });
+});
 router.get('/reset', (req, res) => res.json({
   canReset: isOwner(req.user.email),
   counts: {
