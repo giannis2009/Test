@@ -73,10 +73,14 @@ app.use('/api/admin', admin.router);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: false, setHeaders: (res, file) => { if (/\.svg$/i.test(file)) res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox"); } }));
+// Shareable pages get their own link-preview tags (title / description / image) on the server.
+const meta = require('./meta');
+app.get(['/', '/index.html'], meta.home);
+app.get('/album/:id', meta.album);
+app.get('/product/:slug', meta.product);
+app.get('/cover/:id', meta.cover);
 // No browser caching locally, so every change shows up on a normal refresh.
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'], maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
-app.get('/album/:id', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
-app.get('/product/:slug', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/admin/{*rest}', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 app.get('/{*rest}', (_req, res) => res.status(404).sendFile(path.join(PUBLIC_DIR, 'index.html')));
 

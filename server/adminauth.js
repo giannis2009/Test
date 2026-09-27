@@ -4,13 +4,15 @@
    - brute-force lock per IP and per username, with a delay on every failure
    - own httpOnly SameSite=Strict cookie, sessions stored hashed and revocable
    - no sign-up: a built-in owner login, and the owner creates every other login inside the panel
+   - optional 2FA: a 6-digit code from an authenticator app (TOTP, RFC 6238) + one-time recovery codes
    ========================================================= */
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const express = require('express');
 const { db, get, run, all, now, DATA_DIR } = require('./db');
-const { sha256, randomToken, log, str, clientIp, HttpError } = require('./util');
+const QRCode = require('qrcode');
+const { sha256, hmac, randomToken, log, str, clientIp, HttpError } = require('./util');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS admin_accounts (
@@ -22,6 +24,13 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, last_seen INTEGER, ip TEXT, ua TEXT
 );
 `);
+
+// 2FA columns (added later)
+{
+  const cols = all('PRAGMA table_info(admin_accounts)').map((c) => c.name);
+  for (const c of ['totp_secret', 'totp_pending', 'recovery']) if (!cols.includes(c)) db.exec(`ALTER TABLE admin_accounts ADD COLUMN ${c} TEXT`);
+  if (!cols.includes('totp_last_step')) db.exec('ALTER TABLE admin_accounts ADD COLUMN totp_last_step INTEGER DEFAULT 0');
+}
 
 const COOKIE = 'ezro_admin';
 const SHORT = 12 * 3600_000; // a normal sign-in lasts 12 hours
@@ -51,6 +60,71 @@ function checkPassword(pw, username) {
   if (new Set(pw).size < 5) return 'That password is too simple.';
   return null;
 }
+
+/* ---------- 2FA: TOTP (Google Authenticator, Authy, Microsoft Authenticator…) ---------- */
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32(buf) {
+  let bits = 0; let val = 0; let out = '';
+  for (const b of buf) { val = (val << 8) | b; bits += 8; while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } }
+  if (bits > 0) out += B32[(val << (5 - bits)) & 31];
+  return out;
+}
+// secrets are stored encrypted (AES-256-GCM with a key derived from APP_SECRET), never in plain text
+const TOTP_KEY = crypto.createHash('sha256').update(hmac('ezro-admin-totp')).digest();
+function seal(buf) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', TOTP_KEY, iv);
+  const enc = Buffer.concat([c.update(buf), c.final()]);
+  return `${iv.toString('base64')}.${c.getAuthTag().toString('base64')}.${enc.toString('base64')}`;
+}
+function unseal(s) {
+  try {
+    const [iv, tag, enc] = String(s).split('.').map((x) => Buffer.from(x, 'base64'));
+    const d = crypto.createDecipheriv('aes-256-gcm', TOTP_KEY, iv); d.setAuthTag(tag);
+    return Buffer.concat([d.update(enc), d.final()]);
+  } catch { return null; }
+}
+function totpAt(secret, step) {
+  const msg = Buffer.alloc(8); msg.writeBigUInt64BE(BigInt(step));
+  const hm = crypto.createHmac('sha1', secret).update(msg).digest();
+  const o = hm[hm.length - 1] & 15;
+  return String(((hm.readUInt32BE(o) & 0x7fffffff) % 1_000_000)).padStart(6, '0');
+}
+const stepNow = () => Math.floor(Date.now() / 30_000);
+// accepts the current code and one step either side (clock drift); a code can never be used twice
+function checkTotp(sealed, code, lastStep = 0) {
+  const secret = unseal(sealed);
+  if (!secret || !/^\d{6}$/.test(code)) return 0;
+  for (const d of [0, -1, 1]) {
+    const st = stepNow() + d;
+    if (st > lastStep && crypto.timingSafeEqual(Buffer.from(totpAt(secret, st)), Buffer.from(code))) return st;
+  }
+  return 0;
+}
+function makeRecovery() {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const codes = Array.from({ length: 10 }, () => { const b = crypto.randomBytes(8); const c = [...b].map((x) => A[x % A.length]).join(''); return `${c.slice(0, 4)}-${c.slice(4)}`; });
+  return { codes, stored: JSON.stringify(codes.map((c) => sha256(c))) };
+}
+const normCode = (v) => str(v, 20).toUpperCase().replace(/\s+/g, '');
+// checks a 6-digit code or a one-time recovery code; recovery codes are used up
+function verifySecondFactor(acc, raw) {
+  const code = normCode(raw);
+  if (/^\d{6}$/.test(code)) {
+    const st = checkTotp(acc.totp_secret, code, acc.totp_last_step || 0);
+    if (st) { run('UPDATE admin_accounts SET totp_last_step = ? WHERE id = ?', st, acc.id); return 'totp'; }
+    return null;
+  }
+  const list = JSON.parse(acc.recovery || '[]');
+  const h = sha256(code.replace(/[^A-Z0-9]/g, '').replace(/^(.{4})/, '$1-'));
+  const i = list.indexOf(h);
+  if (i < 0) return null;
+  list.splice(i, 1);
+  run('UPDATE admin_accounts SET recovery = ? WHERE id = ?', JSON.stringify(list), acc.id);
+  return 'recovery';
+}
+const tickets = new Map(); // password OK, waiting for the 6-digit code: ticket -> { id, remember, exp, tries }
+setInterval(() => { const t = Date.now(); for (const [k, v] of tickets) if (v.exp < t) tickets.delete(k); }, 60_000).unref();
 
 /* ---------- brute-force protection ---------- */
 const fails = new Map(); // key -> { n, until, first }
@@ -145,9 +219,37 @@ router.post('/login', async (req, res) => {
     throw new HttpError(401, 'Wrong username or password.');
   }
   fails.delete(ipKey); fails.delete(userKey);
+  if (acc.totp_secret) {
+    // step two: the password was right, now the authenticator code
+    const ticket = randomToken(24);
+    tickets.set(ticket, { id: acc.id, remember: !!req.body?.remember, exp: Date.now() + 5 * 60_000, tries: 0, ip });
+    return res.json({ twoFactor: true, ticket });
+  }
   startSession(req, res, acc, !!req.body?.remember);
   req.user = { email: acc.username }; log(req, 'admin.login', acc.username, req.body?.remember ? 'kept signed in (14 days)' : '');
   res.json({ ok: true, admin: { username: acc.username, role: acc.role } });
+});
+
+router.post('/login/2fa', async (req, res) => {
+  const ip = clientIp(req);
+  if (lockedFor(`ip:${ip}`)) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+  const t = tickets.get(str(req.body?.ticket, 100));
+  if (!t || t.exp < Date.now() || t.ip !== ip) throw new HttpError(401, 'This sign-in expired. Enter your password again.', { restart: true });
+  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', t.id);
+  const how = acc?.totp_secret ? verifySecondFactor(acc, req.body?.code) : null;
+  if (!how) {
+    t.tries += 1; addFail(`ip:${ip}`, 8);
+    if (acc) { req.user = { email: acc.username }; log(req, 'admin.2fa_failed', acc.username, `from ${ip}`); }
+    await pause(400 + Math.random() * 300);
+    if (t.tries >= 5) { tickets.delete(str(req.body?.ticket, 100)); throw new HttpError(401, 'Too many wrong codes. Enter your password again.'); }
+    throw new HttpError(401, 'Wrong code. Check the time on your phone and try again.');
+  }
+  tickets.delete(str(req.body?.ticket, 100));
+  startSession(req, res, acc, t.remember);
+  req.user = { email: acc.username };
+  log(req, 'admin.login', acc.username, how === 'recovery' ? 'with a recovery code' : 'with 2FA');
+  const left = how === 'recovery' ? JSON.parse(acc.recovery || '[]').length - 1 : null;
+  res.json({ ok: true, admin: { username: acc.username, role: acc.role }, recoveryLeft: left });
 });
 
 router.post('/logout', (req, res) => {
@@ -158,10 +260,10 @@ router.post('/logout', (req, res) => {
 
 /* ---------- account management (mounted under /api/admin, behind requireAdmin) ---------- */
 const accounts = express.Router();
-const publicAcc = (a) => ({ id: a.id, username: a.username, role: a.role, created_at: a.created_at, created_by: a.created_by, last_login: a.last_login, pw_changed_at: a.pw_changed_at });
+const publicAcc = (a) => ({ id: a.id, username: a.username, role: a.role, twofa: !!a.totp_secret, created_at: a.created_at, created_by: a.created_by, last_login: a.last_login, pw_changed_at: a.pw_changed_at });
 
 accounts.get('/accounts', (req, res) => res.json({
-  me: { id: req.admin.id, username: req.admin.username, role: req.admin.role },
+  me: (() => { const a = get('SELECT totp_secret, recovery FROM admin_accounts WHERE id = ?', req.admin.id); return { id: req.admin.id, username: req.admin.username, role: req.admin.role, twofa: !!a.totp_secret, recoveryLeft: JSON.parse(a.recovery || '[]').length }; })(),
   canManage: isOwnerReq(req),
   accounts: all('SELECT * FROM admin_accounts ORDER BY role DESC, created_at').map(publicAcc),
   sessions: all('SELECT created_at, last_seen, expires_at, ip, ua, token_hash FROM admin_sessions WHERE admin_id = ? AND expires_at > ? ORDER BY last_seen DESC', req.admin.id, now())
@@ -187,6 +289,63 @@ accounts.put('/account', async (req, res) => {
   if (username !== acc.username) run('UPDATE tasks SET assignee = ? WHERE assignee = ?', username, acc.username);
   log(req, 'admin.account_changed', username, [username !== acc.username ? `username ${acc.username} → ${username}` : '', newPw ? 'password changed' : ''].filter(Boolean).join(', '));
   res.json({ ok: true, username });
+});
+
+/* ---- my 2FA ---- */
+async function needPassword(req, acc) {
+  if (!verifyPassword(typeof req.body?.password === 'string' ? req.body.password : '', acc.pass_hash)) {
+    addFail(`ip:${clientIp(req)}`, 5); await pause(500);
+    throw new HttpError(401, 'Your password is wrong.');
+  }
+}
+accounts.post('/account/2fa/setup', async (req, res) => {
+  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', req.admin.id);
+  await needPassword(req, acc);
+  const secret = crypto.randomBytes(20);
+  run('UPDATE admin_accounts SET totp_pending = ? WHERE id = ?', seal(secret), acc.id);
+  const b32 = base32(secret);
+  const label = encodeURIComponent(`Ezro Admin:${acc.username}`);
+  const uri = `otpauth://totp/${label}?secret=${b32}&issuer=${encodeURIComponent('Ezro Admin')}&algorithm=SHA1&digits=6&period=30`;
+  const qr = await QRCode.toDataURL(uri, { margin: 1, width: 240, color: { dark: '#0d0b12', light: '#ffffff' } });
+  res.json({ secret: b32.replace(/(.{4})/g, '$1 ').trim(), qr, uri });
+});
+accounts.post('/account/2fa/enable', (req, res) => {
+  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', req.admin.id);
+  if (!acc.totp_pending) throw new HttpError(400, 'Start again — scan the QR code first.');
+  const st = checkTotp(acc.totp_pending, normCode(req.body?.code), 0);
+  if (!st) throw new HttpError(400, 'That code is not right. Enter the 6 digits the app shows now.');
+  const rec = makeRecovery();
+  run('UPDATE admin_accounts SET totp_secret = totp_pending, totp_pending = NULL, totp_last_step = ?, recovery = ? WHERE id = ?', st, rec.stored, acc.id);
+  log(req, 'admin.2fa_enabled', acc.username);
+  res.json({ ok: true, recoveryCodes: rec.codes });
+});
+accounts.post('/account/2fa/recovery', async (req, res) => {
+  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', req.admin.id);
+  if (!acc.totp_secret) throw new HttpError(400, '2FA is off.');
+  await needPassword(req, acc);
+  const rec = makeRecovery();
+  run('UPDATE admin_accounts SET recovery = ? WHERE id = ?', rec.stored, acc.id);
+  log(req, 'admin.2fa_recovery_new', acc.username);
+  res.json({ ok: true, recoveryCodes: rec.codes });
+});
+accounts.post('/account/2fa/disable', async (req, res) => {
+  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', req.admin.id);
+  await needPassword(req, acc);
+  if (acc.totp_secret && !verifySecondFactor(acc, req.body?.code)) throw new HttpError(401, 'Wrong 6-digit code.');
+  run('UPDATE admin_accounts SET totp_secret = NULL, totp_pending = NULL, recovery = NULL, totp_last_step = 0 WHERE id = ?', acc.id);
+  log(req, 'admin.2fa_disabled', acc.username);
+  res.json({ ok: true });
+});
+// an owner can switch off someone's 2FA if they lost their phone
+accounts.post('/accounts/:id/2fa/reset', (req, res) => {
+  if (!isOwnerReq(req)) throw new HttpError(403, 'Only an owner can do this.');
+  const acc = get('SELECT * FROM admin_accounts WHERE id = ?', Number(req.params.id));
+  if (!acc) throw new HttpError(404, 'Not found');
+  if (acc.id === req.admin.id) throw new HttpError(400, 'Turn off your own 2FA from “Two-factor authentication”.');
+  run('UPDATE admin_accounts SET totp_secret = NULL, totp_pending = NULL, recovery = NULL, totp_last_step = 0 WHERE id = ?', acc.id);
+  run('DELETE FROM admin_sessions WHERE admin_id = ?', acc.id);
+  log(req, 'admin.2fa_reset', acc.username);
+  res.json({ ok: true });
 });
 
 accounts.post('/account/signout-others', (req, res) => {

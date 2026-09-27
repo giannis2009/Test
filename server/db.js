@@ -8,7 +8,28 @@ const SECURE_DIR = path.join(DATA_DIR, 'secure');    // paid videos, never serve
 const OUTBOX_DIR = path.join(DATA_DIR, 'outbox');    // emails saved here when SMTP is not configured
 for (const d of [DATA_DIR, UPLOAD_DIR, SECURE_DIR, OUTBOX_DIR]) fs.mkdirSync(d, { recursive: true });
 
-const db = new DatabaseSync(path.join(DATA_DIR, 'ezro.db'));
+const DB_FILE = path.join(DATA_DIR, 'ezro.db');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+fs.mkdirSync(BACKUP_DIR, { recursive: true });
+// A restore chosen in Admin → Backups is finished here, before the database is opened:
+// the current database is saved first ("before-restore"), then the backup takes its place.
+{
+  const pending = path.join(DATA_DIR, 'restore-pending.db');
+  if (fs.existsSync(pending)) {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const cur = new DatabaseSync(DB_FILE);
+        const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+        cur.exec(`VACUUM INTO '${path.join(BACKUP_DIR, `before-restore-${stamp}.db`).replace(/'/g, "''")}'`);
+        cur.close();
+      }
+      for (const f of [DB_FILE, `${DB_FILE}-wal`, `${DB_FILE}-shm`]) fs.rmSync(f, { force: true });
+      fs.renameSync(pending, DB_FILE);
+      console.log('[ezro] backup restored');
+    } catch (e) { console.error('[ezro] restore failed:', e.message); }
+  }
+}
+const db = new DatabaseSync(DB_FILE);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 
 db.exec(`
@@ -228,4 +249,4 @@ if (all('PRAGMA table_info(licenses)').some((c) => c.name === 'email' && c.notnu
 
 seed();
 
-module.exports = { db, all, get, run, tx, now, getSetting, setSetting, DEFAULTS, DATA_DIR, UPLOAD_DIR, SECURE_DIR, OUTBOX_DIR };
+module.exports = { db, all, get, run, tx, now, getSetting, setSetting, DEFAULTS, DATA_DIR, UPLOAD_DIR, SECURE_DIR, OUTBOX_DIR, BACKUP_DIR, DB_FILE };

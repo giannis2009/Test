@@ -14,7 +14,7 @@
     ['Store', [['orders', 'Orders', 'receipt'], ['products', 'Products', 'box'], ['discounts', 'Discounts', 'percent'], ['payments', 'Payments & Checkout', 'card']]],
     ['Content', [['media', 'Categories & Media', 'image'], ['socials', 'Social media', 'share'], ['texts', 'Texts', 'type'], ['appearance', 'Appearance', 'palette']]],
     ['Workspace', [['tasks', 'Tasks', 'tasks'], ['customers', 'Customers', 'users']]],
-    ['System', [['security', 'Admins & Security', 'shield'], ['logs', 'Logs', 'logs'], ['reset', 'Reset data', 'refresh']]],
+    ['System', [['security', 'Admins & Security', 'shield'], ['logs', 'Logs', 'logs'], ['backups', 'Backups', 'database'], ['reset', 'Reset data', 'refresh']]],
   ];
 
   /* ---------- shared helpers for pages ---------- */
@@ -196,10 +196,9 @@
       if (!pw.input.value) { showErr('Enter your password.'); pw.input.focus(); return; }
       go.classList.add('loading'); go.disabled = true;
       try {
-        await api('/api/admin-auth/login', { body: { username: user.value.trim(), password: pw.input.value, remember: remember.querySelector('input').checked } });
-        card.classList.add('ok');
-        go.replaceChildren(iconEl('check'), h('span', {}, 'Welcome'));
-        setTimeout(() => { location.hash = location.hash || '#/dashboard'; boot(); }, 520);
+        const r = await api('/api/admin-auth/login', { body: { username: user.value.trim(), password: pw.input.value, remember: remember.querySelector('input').checked } });
+        if (r.twoFactor) { go.classList.remove('loading'); go.disabled = false; codeStep(r.ticket); return; }
+        welcome();
       } catch (ex) {
         go.classList.remove('loading'); go.disabled = false;
         pw.input.value = '';
@@ -207,6 +206,71 @@
         const m = /(\d+) min/.exec(ex.message); if (ex.status === 429 && m) lock(Number(m[1]) * 60);
         pw.input.focus();
       }
+    };
+    const welcome = (msg) => {
+      card.classList.add('ok');
+      if (msg) toast(msg, 'success', 5000);
+      setTimeout(() => { location.hash = location.hash || '#/dashboard'; boot(); }, 520);
+    };
+    // step two: the 6-digit code from the authenticator app (or a recovery code)
+    const codeStep = (ticket) => {
+      const boxes = Array.from({ length: 6 }, (_, i) => h('input', { class: 'otp-box', inputmode: 'numeric', autocomplete: i ? 'off' : 'one-time-code', maxlength: '6', 'aria-label': `Digit ${i + 1}` }));
+      const rec = h('input', { class: 'input mono', placeholder: 'XXXX-XXXX', autocomplete: 'off', maxlength: '9', style: { letterSpacing: '.16em', textTransform: 'uppercase', textAlign: 'center', height: '52px', fontSize: '17px' } });
+      const otp = h('div', { class: 'otp' }, boxes);
+      let useRec = false;
+      const err2 = h('div', { class: 'lg-error', role: 'alert' });
+      const bad = (m) => { err2.replaceChildren(iconEl('shield'), h('span', {}, m)); err2.classList.add('on'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); };
+      const btn = h('button', { class: 'btn primary lg block lg-go', type: 'submit' }, h('span', {}, 'Verify'), iconEl('check'));
+      const value = () => (useRec ? rec.value : boxes.map((b) => b.value).join(''));
+      const submit = async () => {
+        if (btn.disabled) return;
+        const code = value();
+        if (!useRec && code.length < 6) { bad('Enter all 6 digits.'); return; }
+        if (useRec && code.replace(/[^A-Za-z0-9]/g, '').length < 8) { bad('Enter a recovery code.'); return; }
+        btn.classList.add('loading'); btn.disabled = true; err2.classList.remove('on');
+        try {
+          const r = await api('/api/admin-auth/login/2fa', { body: { ticket, code } });
+          welcome(r.recoveryLeft != null ? `Signed in with a recovery code — ${r.recoveryLeft} left` : null);
+        } catch (ex) {
+          btn.classList.remove('loading'); btn.disabled = false;
+          if (/password again/i.test(ex.message)) { loginScreen(null); toast(ex.message, 'error', 5000); return; }
+          bad(ex.message);
+          boxes.forEach((b) => { b.value = ''; b.classList.remove('filled'); }); rec.value = '';
+          (useRec ? rec : boxes[0]).focus();
+        }
+      };
+      boxes.forEach((b, i) => {
+        b.addEventListener('input', () => {
+          const d = b.value.replace(/\D/g, '');
+          if (d.length > 1) { d.slice(0, 6).split('').forEach((c, j) => { if (boxes[i + j]) { boxes[i + j].value = c; boxes[i + j].classList.add('filled'); } }); boxes[Math.min(5, i + d.length - 1)].focus(); }
+          else { b.value = d; b.classList.toggle('filled', !!d); if (d && boxes[i + 1]) boxes[i + 1].focus(); }
+          if (value().length === 6) submit();
+        });
+        b.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && !b.value && boxes[i - 1]) { boxes[i - 1].value = ''; boxes[i - 1].classList.remove('filled'); boxes[i - 1].focus(); e.preventDefault(); }
+          if (e.key === 'ArrowLeft' && boxes[i - 1]) boxes[i - 1].focus();
+          if (e.key === 'ArrowRight' && boxes[i + 1]) boxes[i + 1].focus();
+        });
+        b.addEventListener('focus', () => b.select());
+      });
+      const swap = h('button', { type: 'button', class: 'lg-link' }, 'Use a recovery code instead');
+      const field = h('div', { class: 'lg-group' }, otp);
+      swap.onclick = () => {
+        useRec = !useRec;
+        field.replaceChildren(useRec ? rec : otp);
+        swap.textContent = useRec ? 'Use the 6-digit code instead' : 'Use a recovery code instead';
+        err2.classList.remove('on'); (useRec ? rec : boxes[0]).focus();
+      };
+      const f2 = h('form', { class: 'lg-form', novalidate: true }, field, err2, btn,
+        h('div', { class: 'lg-links' }, swap, h('button', { type: 'button', class: 'lg-link', onclick: () => loginScreen(null) }, 'Back')));
+      f2.onsubmit = (e) => { e.preventDefault(); submit(); };
+      card.querySelector('.lg-badge').innerHTML = icon('phone');
+      card.querySelector('h1').textContent = 'Two-step verification';
+      card.querySelector('.lg-sub').textContent = 'Open your authenticator app and enter the 6-digit code for Ezro Admin.';
+      card.querySelector('.lg-note')?.remove();
+      form.replaceWith(f2);
+      card.animate([{ opacity: 0.4, transform: 'translateX(18px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      requestAnimationFrame(() => boxes[0].focus());
     };
     const note = mode === 'expired' ? 'Your session ended. Sign in again.' : mode === 'signedout' ? 'You are signed out.' : null;
     const card = h('div', { class: 'lg-card' },
@@ -426,12 +490,66 @@
     };
     const list = h('div', { class: 'list' }, accounts.map((a) => h('div', { class: 'lrow' },
       h('div', { class: 'ic', html: icon(a.role === 'owner' ? 'shield' : 'user') }),
-      h('div', { class: 'tt' }, h('strong', {}, a.username, a.id === me.id ? ' (you)' : ''),
+      h('div', { class: 'tt' }, h('strong', {}, a.username, a.id === me.id ? ' (you)' : '', a.twofa ? h('span', { class: 'chip good', style: { marginLeft: '8px', display: 'inline-flex', verticalAlign: 'middle' } }, '2FA') : null),
         h('span', {}, `${a.role === 'owner' ? 'Owner' : 'Admin'} · ${a.last_login ? `last sign-in ${E.timeAgo(a.last_login)}` : 'never signed in'}`)),
+      canManage && a.id !== me.id && a.twofa ? h('button', { class: 'btn icon sm ghost', 'aria-label': 'Reset 2FA', title: 'Turn off their 2FA (lost phone)', html: icon('phone'), onclick: async () => {
+        if (await E.confirmDialog(`Turn off 2FA for ${a.username}?`, 'Use this if they lost their phone. They are signed out and can turn it on again.', { ok: 'Turn off', danger: true })) { await api(`/api/admin/accounts/${a.id}/2fa/reset`, { body: {} }).then(() => toast('2FA turned off', 'success')).catch(fail); Admin.refresh(); }
+      } }) : null,
       canManage && a.id !== me.id ? h('button', { class: 'btn icon sm ghost', 'aria-label': 'Set password', title: 'Set a new password', html: icon('key'), onclick: () => resetPw(a) }) : null,
       canManage && a.id !== me.id ? h('button', { class: 'btn icon sm ghost danger', 'aria-label': 'Remove', html: icon('trash'), onclick: async () => {
         if (await E.confirmDialog(`Remove ${a.username}?`, 'They are signed out and can no longer open the admin panel.', { ok: 'Remove', danger: true })) { await api(`/api/admin/accounts/${a.id}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); }
       } }) : null)));
+
+    // ---- 2FA
+    const showRecovery = (codes, title = 'Save your recovery codes') => {
+      const txt = `Ezro Admin — recovery codes for ${me.username}\nEach code works once, if you lose your phone.\n\n${codes.join('\n')}\n`;
+      const dl = h('button', { class: 'btn' }, iconEl('download'), 'Download .txt');
+      dl.onclick = () => { const a = h('a', { href: URL.createObjectURL(new Blob([txt], { type: 'text/plain' })), download: `ezro-recovery-${me.username}.txt` }); document.body.append(a); a.click(); a.remove(); };
+      const done = h('button', { class: 'btn primary' }, 'I saved them');
+      const sh = E.sheet({ title, body: h('div', { class: 'form' },
+        h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'If you lose your phone, each of these codes lets you in once instead of the 6-digit code. Keep them somewhere safe — they are shown only now.'),
+        h('div', { class: 'rec-grid' }, codes.map((c) => h('code', {}, c)))),
+      foot: [h('button', { class: 'btn', onclick: () => E.copy(codes.join('\n')) }, iconEl('copy'), 'Copy'), dl, h('div', { class: 'spacer' }), done] });
+      done.onclick = () => { sh.close(); Admin.refresh(); };
+    };
+    const askPassword = (title, desc, withCode, onOk) => {
+      const p = Admin.pwField('Your password');
+      const code = withCode ? E.input('', { placeholder: '6-digit code or recovery code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '9', style: { fontFamily: 'var(--mono)', letterSpacing: '.12em' } }) : null;
+      const ok = h('button', { class: 'btn primary' }, 'Continue');
+      const sh = E.sheet({ title, body: h('div', { class: 'form' }, h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, desc), p.el, code ? E.field('Code from your app', code) : null),
+        foot: [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => sh.close() }, 'Cancel'), ok] });
+      ok.onclick = () => withBusy(ok, async () => { try { await onOk(p.input.value, code?.value, sh); } catch (e) { fail(e); } });
+      requestAnimationFrame(() => p.input.focus());
+    };
+    const startTwofa = () => askPassword('Turn on two-step verification', 'Confirm it is you.', false, async (password, _c, sh1) => {
+      const r = await api('/api/admin/account/2fa/setup', { body: { password } });
+      sh1.close();
+      const code = E.input('', { placeholder: '000000', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', style: { fontFamily: 'var(--mono)', fontSize: '22px', letterSpacing: '.35em', textAlign: 'center', height: '56px' } });
+      const ok = h('button', { class: 'btn primary' }, iconEl('check'), 'Turn on');
+      const sh = E.sheet({ title: 'Scan with your authenticator app', size: 'wide', body: h('div', { class: 'tfa-setup' },
+        h('div', { class: 'tfa-qr' }, h('img', { src: r.qr, alt: 'QR code', width: 220, height: 220 })),
+        h('div', { class: 'form' },
+          h('ol', { class: 'tfa-steps' },
+            h('li', {}, 'Install ', h('strong', {}, 'Google Authenticator'), ', Microsoft Authenticator or Authy on your phone.'),
+            h('li', {}, 'Tap ', h('strong', {}, '+'), ' and scan this QR code.'),
+            h('li', {}, 'Type the 6-digit code the app shows.')),
+          E.field('Can’t scan? Enter this key', h('div', { class: 'input-group' }, h('code', { class: 'tfa-key' }, r.secret), h('button', { type: 'button', class: 'btn icon sm ghost', 'aria-label': 'Copy key', html: icon('copy'), onclick: () => E.copy(r.secret.replace(/ /g, '')) }))),
+          E.field('6-digit code', code))),
+      foot: [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => sh.close() }, 'Cancel'), ok] });
+      const enable = () => withBusy(ok, async () => { try { const x = await api('/api/admin/account/2fa/enable', { body: { code: code.value } }); sh.close(); toast('Two-step verification is on', 'success'); showRecovery(x.recoveryCodes); } catch (e) { fail(e); code.select(); } });
+      ok.onclick = enable;
+      code.addEventListener('input', () => { code.value = code.value.replace(/\D/g, ''); if (code.value.length === 6) enable(); });
+      requestAnimationFrame(() => code.focus());
+    });
+    const twofaPanel = Admin.panel('Two-step verification (2FA)', h('div', { class: 'form' },
+      h('div', { class: 'tfa-state' },
+        h('div', { class: `tfa-ic ${me.twofa ? 'on' : ''}`, html: icon(me.twofa ? 'shield' : 'phone') }),
+        h('div', {}, h('strong', {}, me.twofa ? 'On' : 'Off'),
+          h('span', {}, me.twofa ? `After your password you enter a 6-digit code from your phone. ${me.recoveryLeft} recovery code${me.recoveryLeft === 1 ? '' : 's'} left.` : 'Add a 6-digit code from an app on your phone. Even if someone learns your password, they cannot get in.'))),
+      h('div', { class: 'form-actions' }, me.twofa
+        ? [h('button', { class: 'btn', onclick: () => askPassword('New recovery codes', 'Your old recovery codes stop working.', false, async (password, _c, sh) => { const x = await api('/api/admin/account/2fa/recovery', { body: { password } }); sh.close(); showRecovery(x.recoveryCodes, 'Your new recovery codes'); }) }, iconEl('refresh'), 'New recovery codes'),
+          h('button', { class: 'btn danger', onclick: () => askPassword('Turn off two-step verification', 'Enter your password and a code from your app.', true, async (password, code, sh) => { await api('/api/admin/account/2fa/disable', { body: { password, code } }); sh.close(); toast('Two-step verification is off'); Admin.refresh(); }) }, 'Turn off')]
+        : h('button', { class: 'btn primary', onclick: startTwofa }, iconEl('shield'), 'Turn on 2FA'))));
 
     // ---- my devices
     const uaName = (ua = '') => `${/Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser'} · ${/Windows/.test(ua) ? 'Windows' : /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Unknown'}`;
@@ -452,6 +570,7 @@
             E.field('Current password', cur.el),
             E.field('New password', h('div', { style: { display: 'grid', gap: '10px' } }, npw.el, npw2.el), 'At least 10 characters. Changing it signs out every other device.'),
             h('div', { class: 'form-actions' }, saveMe))),
+          twofaPanel,
           Admin.panel('Your devices', h('div', { class: 'list' }, sessions.map((x) => h('div', { class: 'lrow' },
             h('div', { class: 'ic', html: icon(/iPhone|Android/.test(x.ua) ? 'phone' : 'globe') }),
             h('div', { class: 'tt' }, h('strong', {}, uaName(x.ua), x.current ? h('span', { class: 'chip good', style: { marginLeft: '8px', display: 'inline-flex', width: 'auto', verticalAlign: 'middle' } }, 'This device') : null),
@@ -467,6 +586,52 @@
             h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
             h('div', { class: 'form-actions' }, save)))))),
     ];
+  };
+
+  /* ================= Backups ================= */
+  Admin.pages.backups = async () => {
+    const { backups, next, canManage, copyDir, sizes } = await api('/api/admin/backups');
+    const size = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+    const KIND = { auto: ['good', 'Daily'], manual: ['', 'Manual'], before: ['warn', 'Before restore'] };
+    const now = h('button', { class: 'btn primary' }, iconEl('database'), 'Back up now');
+    now.onclick = () => withBusy(now, async () => { try { await api('/api/admin/backups', { body: {} }); toast('Backup created', 'success'); Admin.refresh(); } catch (e) { fail(e); } });
+    const full = h('a', { class: 'btn', href: '/api/admin/backups/full.zip', download: '' }, iconEl('download'), 'Download everything (.zip)');
+    const restore = async (b) => {
+      const inp = E.input('', { placeholder: 'Type RESTORE', autocomplete: 'off', style: { fontFamily: 'var(--mono)', textTransform: 'uppercase' } });
+      const ok = h('button', { class: 'btn danger solid' }, 'Restore');
+      const sh = E.sheet({ title: `Restore ${E.fmtDateTime(b.at)}?`, body: h('div', { class: 'form' },
+        h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'The site goes back to exactly how it was at that moment — products, orders, texts, settings and logins. Everything after it is replaced. The current state is saved first as a “Before restore” backup, so you can undo this.'),
+        inp), foot: [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => sh.close() }, 'Cancel'), ok] });
+      ok.onclick = () => withBusy(ok, async () => {
+        try {
+          await api(`/api/admin/backups/${encodeURIComponent(b.name)}/restore`, { body: { confirm: inp.value.trim().toUpperCase() } });
+          sh.close(); toast('Restoring — the site restarts in a few seconds…', 'success', 8000);
+          // wait for the server to come back, then reload
+          const wait = async (n = 0) => { await new Promise((r) => setTimeout(r, 1500)); try { await fetch('/api/admin-auth/status'); location.reload(); } catch { if (n < 40) wait(n + 1); } };
+          setTimeout(() => wait(), 1500);
+        } catch (e) { fail(e); }
+      });
+    };
+    const rows = backups.length ? h('div', { class: 'list' }, backups.map((b) => { const [c, l] = KIND[b.kind] || KIND.manual; return h('div', { class: 'lrow' },
+      h('div', { class: 'ic', html: icon('database') }),
+      h('div', { class: 'tt' }, h('strong', {}, E.fmtDateTime(b.at), h('span', { class: `chip ${c}`, style: { marginLeft: '8px', display: 'inline-flex', verticalAlign: 'middle' } }, l)), h('span', {}, `${size(b.size)} · ${E.timeAgo(b.at)}`)),
+      canManage ? h('a', { class: 'btn icon sm ghost', href: `/api/admin/backups/${encodeURIComponent(b.name)}/download`, 'aria-label': 'Download', title: 'Download', html: icon('download') }) : null,
+      canManage ? h('button', { class: 'btn sm', onclick: () => restore(b) }, iconEl('refresh'), 'Restore') : null,
+      canManage ? h('button', { class: 'btn icon sm ghost danger', 'aria-label': 'Delete', html: icon('trash'), onclick: async () => { if (await E.confirmDialog('Delete this backup?', E.fmtDateTime(b.at), { ok: 'Delete', danger: true })) { await api(`/api/admin/backups/${encodeURIComponent(b.name)}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); } } }) : null); }))
+      : h('div', { class: 'empty' }, iconEl('database'), 'The first daily backup is made a few seconds after the site starts.');
+    const last = backups[0];
+    return [Admin.head('Backups', 'A full copy of your database is made automatically every day and kept for 30 days.', ...(canManage ? [full, now] : [])),
+      h('div', { class: 'page' },
+        h('div', { class: 'stats', style: { marginBottom: '18px' } },
+          Admin.stat('Last backup', last ? E.timeAgo(last.at) : '—', last && Date.now() - last.at < 2 * 86400_000 ? '' : 'bad', last ? E.fmtDateTime(last.at) : 'none yet'),
+          Admin.stat('Next daily backup', next - Date.now() > 3600_000 ? `in ${Math.round((next - Date.now()) / 3600_000)} h` : 'within the hour', '', next > Date.now() ? E.fmtDateTime(next) : ''),
+          Admin.stat('Backups kept', String(backups.length), '', '30 days'),
+          Admin.stat('Images & files', size(sizes.uploads + sizes.secure), '', 'included in the .zip')),
+        Admin.panel('Saved backups', rows),
+        h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '14px', lineHeight: 1.6 } },
+          'Daily backups contain the database: products, albums, orders, codes, texts, settings and admin logins. ',
+          '“Download everything” also includes every uploaded image, video and download file — keep one on a USB stick or cloud drive now and then. ',
+          copyDir ? 'A second copy of each backup is also saved to your BACKUP_COPY_DIR folder.' : 'Tip: set BACKUP_COPY_DIR in .env to a OneDrive / Google Drive folder and every backup is copied there too.'))];
   };
 
   /* ================= Reset data ================= */

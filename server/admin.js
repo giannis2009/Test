@@ -14,6 +14,7 @@ const { log, str, int, bool, cents, slugify, safeUrl, hex, money, licenseKey, Ht
 const router = express.Router();
 router.use(requireAdmin);
 router.use(accounts);
+router.use(require('./backup').router);
 
 const J = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const day = (t) => new Date(t).toISOString().slice(0, 10);

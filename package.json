@@ -13,10 +13,12 @@
     "live": "node scripts/live.js"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "express": "^5.2.1",
     "google-auth-library": "^11.1.0",
     "helmet": "^8.3.0",
     "multer": "^2.4.0",
-    "nodemailer": "^10.0.10"
+    "nodemailer": "^10.0.10",
+    "qrcode": "^1.5.4"
   }
 }

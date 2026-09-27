@@ -72,6 +72,28 @@ npm start                # http://localhost:3000
 - Κάθε προσπάθεια γράφεται στα Logs.
 - Το session είναι σε httpOnly/SameSite cookie.
 
+**2FA (δεύτερο βήμα):** Admins & Security → «Turn on 2FA».
+- Σκανάρεις το QR με Google Authenticator, Microsoft Authenticator ή Authy.
+- Μετά τον κωδικό, το login ζητάει και 6ψήφιο κωδικό από το κινητό.
+- Παίρνεις και 10 recovery codes, για την περίπτωση που χάσεις το κινητό. Κάθε κωδικός δουλεύει μία φορά.
+- Αν κάποιος admin χάσει το κινητό του, ο Owner του κλείνει το 2FA από τη λίστα των λογαριασμών.
+
+## Backups
+
+- **Κάθε μέρα** γίνεται αυτόματα αντίγραφο της βάσης στο `data/backups/` και κρατιέται 30 μέρες.
+- Admin → **Backups**:
+  - «Back up now» για αντίγραφο τώρα.
+  - Κατέβασμα ενός αντιγράφου.
+  - **«Download everything (.zip)»:** βάση, εικόνες, videos και αρχεία, όλα μαζί.
+  - **Restore:** γυρνάει το site σε ένα αντίγραφο. Η τωρινή κατάσταση σώζεται πρώτα, για να μπορείς να το αναιρέσεις.
+- Με `BACKUP_COPY_DIR` στο `.env`, κάθε αντίγραφο πηγαίνει και σε δεύτερο φάκελο (π.χ. OneDrive).
+
+## Share
+
+- Κάθε cover έχει κουμπί Share (και στη μεγάλη προβολή), το ίδιο και τα albums και τα προϊόντα.
+- Κάθε cover έχει δικό του link (`/cover/12`). Όταν το link μπαίνει σε Instagram, Discord, Viber, WhatsApp ή Messenger, φαίνεται με μεγάλη εικόνα, τίτλο και καλλιτέχνη.
+- Η προεπισκόπηση δουλεύει μόνο όταν το site είναι online. Από το `localhost` οι εφαρμογές δεν μπορούν να το δουν.
+
 ## Ρυθμίσεις (.env)
 
 - **Google login:** `GOOGLE_CLIENT_ID`. Φτιάξε OAuth Client ID τύπου *Web* και πρόσθεσε το domain σου στα *Authorized JavaScript origins*.

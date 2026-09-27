@@ -315,6 +315,7 @@
     tile.onclick = open;
     tile.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     tile.addEventListener('contextmenu', (e) => e.preventDefault());
+    tile.append(shareBtn(() => shareCover(m), 'on-card'));
     natural(tile, m.url, m.type === 'video');
     return hasSong(m) ? songTile(tile, mediaSong(m)) : tile;
   }
@@ -505,6 +506,7 @@
           return c;
         })() : null,
         h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
+          h('div', {}, h('button', { class: 'btn sm', onclick: () => share({ path: `/album/${a.id}`, title: a.title, text: [a.song_title, a.artist].filter(Boolean).join(' — '), image: cover }) }, iconEl('share'), 'Share')),
           a.song_title || a.artist ? h('p', { class: 'album-song' }, a.song_title ? h('strong', {}, a.song_title) : null, a.song_title && a.artist ? ' — ' : null, a.artist || null) : null,
           [a.release_date, a.genre].some(Boolean) ? h('div', { class: 'album-facts' }, [a.release_date, a.genre].filter(Boolean).map((t) => h('span', { class: 'chip' }, t))) : null,
           a.description ? h('p', {}, a.description) : null,
@@ -515,6 +517,44 @@
     E.applyTexts(view, 'home');
   }
 
+  /* ---------- share: native share sheet on phones, our own panel elsewhere ---------- */
+  const coverTitle = (m) => m.song_title || realTitle(m.title) || S.site.categories.find((c) => c.id === m.category_id)?.name || S.site.site.name;
+  function share({ path, title, text, image }) {
+    const url = `${location.origin}${path}`;
+    const mobile = matchMedia('(hover: none)').matches;
+    if (mobile && navigator.share) { navigator.share({ title, text, url }).catch(() => {}); return; }
+    const copy = async (msg) => { try { await navigator.clipboard.writeText(url); toast(msg || 'Link copied', 'success'); } catch { toast('Copy failed', 'error'); } };
+    const enc = encodeURIComponent;
+    const msg = `${title} — ${url}`;
+    const opt = (label, ic, cls, act) => h('button', { type: 'button', class: `sh-opt ${cls}`, onclick: act }, h('span', { class: 'sh-ic', html: icon(ic) }), h('span', {}, label));
+    const open = (u) => window.open(u, '_blank', 'noopener,noreferrer,width=640,height=640');
+    const link = h('div', { class: 'sh-link' }, h('span', { class: 'mono' }, url.replace(/^https?:\/\//, '')), h('button', { type: 'button', class: 'btn primary sm', onclick: () => copy() }, iconEl('copy'), 'Copy'));
+    const sh = sheet({ title: 'Share', body: h('div', { class: 'sh' },
+      h('div', { class: 'sh-card' }, image ? h('div', { class: 'sh-img', style: { backgroundImage: `url("${image}")` } }) : null,
+        h('div', { class: 'sh-meta' }, h('strong', {}, title), text ? h('span', {}, text) : null, h('small', {}, location.host))),
+      h('div', { class: 'sh-grid' },
+        opt('Instagram', 'instagram', 'ig', () => copy('Link copied — paste it in your Instagram story or DM')),
+        opt('Discord', 'discord', 'dc', () => copy('Link copied — paste it in Discord')),
+        opt('Viber', 'phone', 'vb', () => { location.href = `viber://forward?text=${enc(msg)}`; }),
+        opt('WhatsApp', 'whatsapp', 'wa', () => open(`https://wa.me/?text=${enc(msg)}`)),
+        opt('Telegram', 'telegram', 'tg', () => open(`https://t.me/share/url?url=${enc(url)}&text=${enc(title)}`)),
+        opt('Facebook', 'facebook', 'fb', () => open(`https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`)),
+        opt('X', 'x', 'xx', () => open(`https://twitter.com/intent/tweet?url=${enc(url)}&text=${enc(title)}`)),
+        opt('Email', 'mail', 'em', () => { location.href = `mailto:?subject=${enc(title)}&body=${enc(msg)}`; })),
+      link) });
+    return sh;
+  }
+  const shareBtn = (fn, cls = '') => h('button', { type: 'button', class: `share-btn ${cls}`, 'aria-label': 'Share', title: 'Share', html: icon('share'), onclick: (e) => { e.preventDefault(); e.stopPropagation(); fn(); } });
+  const shareCover = (m) => share({ path: `/cover/${m.id}`, title: coverTitle(m), text: [m.artist, S.site.categories.find((c) => c.id === m.category_id)?.name].filter(Boolean).join(' · '), image: m.type === 'video' ? m.poster : m.url });
+  // a shared /cover/:id link opens that cover full screen on top of the portfolio
+  function openCover(id) {
+    const m = S.media.find((x) => x.id === id);
+    if (!m) { toast('That cover is no longer available'); history.replaceState({}, '', '/'); return; }
+    const list = m.album_id ? S.media.filter((x) => x.album_id === m.album_id) : S.media.filter((x) => !x.album_id && x.category_id === m.category_id);
+    const go = () => (document.body.classList.contains('loading') ? setTimeout(go, 200) : lightbox(list, Math.max(0, list.indexOf(m))));
+    go();
+  }
+
   function lightbox(items, index) {
     let i = index;
     const stage = h('div', { class: 'lb-stage' });
@@ -522,9 +562,11 @@
     const body = h('div', { class: 'lb-body' }, stage, songSlot);
     const cap = h('div', { class: 'lb-cap' });
     const stopInline = () => { if (player.panel?.classList.contains('inline')) closeSong(); };
-    const close = () => { stopInline(); lb.classList.add('closing'); setTimeout(() => lb.remove(), 250); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    const basePath = location.pathname.startsWith('/cover/') ? '/' : location.pathname;
+    const close = () => { stopInline(); history.replaceState(history.state, '', basePath); lb.classList.add('closing'); setTimeout(() => lb.remove(), 250); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
     const show = () => {
       const m = items[i];
+      if (m.id) history.replaceState(history.state, '', `/cover/${m.id}`);
       const el = m.type === 'video' ? h('video', { src: m.url, controls: true, autoplay: true, playsinline: true, loop: true }) : h('img', { src: m.url, alt: m.title || '', draggable: 'false', oncontextmenu: (e) => e.preventDefault() });
       stage.replaceChildren(el);
       el.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.34,1.4,.64,1)' });
@@ -540,6 +582,7 @@
     const nav = (d) => { i = (i + d + items.length) % items.length; show(); };
     const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-modal': 'true' }, body, cap,
       h('button', { class: 'btn icon lb-close', 'aria-label': 'Close', html: icon('close'), onclick: close }),
+      h('button', { class: 'btn icon lb-share', 'aria-label': 'Share', title: 'Share', html: icon('share'), onclick: (e) => { e.stopPropagation(); shareCover(items[i]); } }),
       items.length > 1 ? h('button', { class: 'btn icon lb-nav prev', 'aria-label': 'Previous', html: icon('chevron-left'), onclick: (e) => { e.stopPropagation(); nav(-1); } }) : null,
       items.length > 1 ? h('button', { class: 'btn icon lb-nav next', 'aria-label': 'Next', html: icon('chevron-right'), onclick: (e) => { e.stopPropagation(); nav(1); } }) : null);
     lb.onclick = (e) => { if (e.target === lb || e.target === body || e.target === stage || e.target === songSlot) close(); };
@@ -756,6 +799,7 @@
         h('div', { class: 'pp-info' },
           cat ? h('p', { class: 'eyebrow' }, cat.name) : null,
           h('h1', {}, p.title), p.subtitle ? h('p', { class: 'pp-sub' }, p.subtitle) : null,
+          h('div', { style: { marginTop: '14px' } }, h('button', { class: 'btn sm', onclick: () => share({ path: `/product/${encodeURIComponent(p.slug)}`, title: p.title, text: p.subtitle, image: p.cover_url || p.gallery?.[0] }) }, iconEl('share'), 'Share')),
           p.badge ? h('span', { class: 'chip brand', style: { marginTop: '12px' } }, p.badge) : null,
           p.description ? h('p', { class: 'pv-desc', style: { marginTop: '22px' } }, p.description) : null,
           p.features?.length ? h('div', { class: 'pp-block' }, h('h3', {}, 'What’s included'), h('ul', { class: 'features' }, p.features.map((f) => h('li', {}, iconEl('check'), h('span', {}, f))))) : null,
@@ -782,6 +826,7 @@
   function route() {
     const m = location.pathname.match(/^\/product\/([^/]+)/);
     const am = location.pathname.match(/^\/album\/(\d+)/);
+    const cm = location.pathname.match(/^\/cover\/(\d+)/);
     const p = m && S.products.find((x) => x.slug === decodeURIComponent(m[1]));
     const al = am && S.albums.find((x) => x.id === Number(am[1]));
     $$('.p-media img').forEach((img) => { img.style.viewTransitionName = ''; });
@@ -796,6 +841,7 @@
       $('#homeView').classList.remove('hidden');
       document.title = `${S.site.site.name} — Creative Studio`;
       if (m || am) toast('That page is no longer available');
+      if (cm && !$('.lightbox')) openCover(Number(cm[1]));
       requestAnimationFrame(() => window.scrollTo({ top: homeScroll, behavior: 'instant' }));
     }
     renderNav();
