@@ -156,7 +156,8 @@ router.post('/checkout', requireUser, rateLimit({ max: 15 }), wrap(async (req, r
     if (!checkout.paypalEnabled || !paypal.configured()) throw new HttpError(400, 'PayPal is not available right now.');
     const order = createOrder(req.user, q, 'paypal', checkout.paypalLabel || 'PayPal');
     try {
-      const pp = await paypal.createOrder(order, getSetting('site').name);
+      const source = ['paypal', 'card', 'paylater', 'venmo'].includes(req.body?.paypalSource) ? req.body.paypalSource : 'paypal';
+      const pp = await paypal.createOrder(order, getSetting('site').name, source === 'card' ? 'card' : 'paypal');
       run('UPDATE orders SET paypal_order_id = ? WHERE id = ?', pp.id, order.id);
       log(req, 'order.created', order.number, { method: 'paypal', total: order.total_cents / 100 });
       return res.json({ order: publicOrder(order), paypalOrderId: pp.id });

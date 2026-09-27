@@ -1090,8 +1090,9 @@
       let orderId = null;
       window.paypal.Buttons({
         style: { layout: 'vertical', shape: 'pill', color: document.documentElement.dataset.theme === 'light' ? 'black' : 'white', label: 'pay', height: 48, disableMaxWidth: true },
-        createOrder: async () => {
-          const r = await api('/api/shop/checkout', { body: { productIds: S.cart, code: S.code, method: 'paypal', acceptTerms: st.terms } }).catch((e) => { fail(e); throw e; });
+        // data.paymentSource = the button pressed: 'paypal' (balance / bank / saved card) or 'card' (no PayPal account needed)
+        createOrder: async (data) => {
+          const r = await api('/api/shop/checkout', { body: { productIds: S.cart, code: S.code, method: 'paypal', paypalSource: data?.paymentSource || 'paypal', acceptTerms: st.terms } }).catch((e) => { fail(e); throw e; });
           orderId = r.order.id;
           if (r.order.status === 'paid') { done(r.order); throw new Error('free'); }
           return r.paypalOrderId;
@@ -1104,7 +1105,7 @@
           catch (e) { fail(e); renderPay(); }
         },
         onCancel: () => { if (orderId) api('/api/shop/paypal/cancel', { body: { orderId } }).catch(() => {}); toast('Payment cancelled'); },
-        onError: (err) => { if (String(err?.message) !== 'free') toast('PayPal ran into a problem. Please try again.', 'error'); },
+        onError: (err) => { if (String(err?.message) !== 'free') { console.error('PayPal:', err); toast('PayPal ran into a problem. Please try again.', 'error'); } },
       }).render(slot);
     }
 

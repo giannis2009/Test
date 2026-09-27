@@ -37,8 +37,11 @@ async function call(path, method = 'GET', body, idempotencyKey) {
 
 const fmt = (c) => (c / 100).toFixed(2);
 
-function createOrder(order, brandName) {
-  return call('/v2/checkout/orders', 'POST', {
+// source = which button the buyer pressed: 'paypal' (log in → pay from PayPal balance, bank or a saved card)
+// or 'card' (debit / credit card without a PayPal account).
+function createOrder(order, brandName, source = 'paypal') {
+  const brand = brandName.slice(0, 127);
+  const body = {
     intent: 'CAPTURE',
     purchase_units: [{
       reference_id: String(order.id),
@@ -46,8 +49,17 @@ function createOrder(order, brandName) {
       description: `${brandName} order ${order.number}`.slice(0, 127),
       amount: { currency_code: order.currency, value: fmt(order.total_cents) },
     }],
-    application_context: { brand_name: brandName.slice(0, 127), shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW' },
-  }, `create-${order.id}-${order.created_at}`);
+  };
+  if (source === 'paypal') {
+    // opens the PayPal log-in first (not the guest card form), so buyers can pay straight from their balance
+    body.payment_source = { paypal: { experience_context: {
+      brand_name: brand, shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW', landing_page: 'LOGIN',
+      payment_method_preference: 'IMMEDIATE_PAYMENT_REQUIRED',
+    } } };
+  } else {
+    body.application_context = { brand_name: brand, shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW' };
+  }
+  return call('/v2/checkout/orders', 'POST', body, `create-${order.id}-${order.created_at}-${source}`);
 }
 
 const captureOrder = (paypalOrderId) => call(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, 'POST', {}, `capture-${paypalOrderId}`);
