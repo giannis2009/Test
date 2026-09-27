@@ -566,7 +566,7 @@
     document.body.classList.toggle('no-grid', a.grid === false);
     document.body.classList.toggle('no-glass', a.glass === false);
     if (a.heroSize) root.setProperty('--hero-size', `${a.heroSize}px`);
-    if (a.faviconUrl) { const l = $('link[rel="icon"]'); if (l) l.href = a.faviconUrl; }
+    if (a.faviconUrl && a.faviconUrl !== '/assets/favicon.png') { const l = $('link[rel="icon"]'); if (l) l.href = a.faviconUrl; }
     if (a.defaultTheme) {
       try { localStorage.setItem('ezro-default-theme', a.defaultTheme); } catch { /* */ }
       let manual = null; try { manual = localStorage.getItem('ezro-theme'); } catch { /* */ }
