@@ -92,10 +92,20 @@
       photos.filter((m) => m.type === 'image').map((m) => h('button', { type: 'button', class: 'mitem', style: { padding: 0, cursor: 'pointer' }, title: 'Use as cover', onclick: () => { cover.set(m.url); toast('Cover set — save to apply'); } }, h('img', { src: m.url, alt: '' })))) : null;
     const catSel = select(categories.map((c) => ({ value: c.id, label: c.name, icon: c.icon })), a.category_id);
     const visible = toggle(!!a.visible, 'Visible on the site');
+    // song shown on the back of the cover
+    const song = {
+      song_title: input(a.song_title, { placeholder: 'e.g. Midnight' }), artist: input(a.artist, { placeholder: 'e.g. Artist name' }),
+      release_date: input(a.release_date, { placeholder: 'e.g. March 2026' }), genre: input(a.genre, { placeholder: 'e.g. Trap, Pop' }),
+      link_url: input(a.link_url, { placeholder: 'Spotify / YouTube / Apple Music link', type: 'url' }),
+      credits: textarea(a.credits, { placeholder: 'Credits & info — e.g. Cover art by Ezro · Mixed by …', style: { minHeight: '70px' } }),
+    };
+    const audio = E.uploadBox({ value: a.audio_url || '', accept: 'audio/*', label: 'Song / preview (MP3, M4A, WAV)' });
+    const clearAudio = h('button', { type: 'button', class: 'btn sm', onclick: () => audio.set('') }, 'Remove song');
     const save = h('button', { class: 'btn primary' }, isNew ? 'Create album' : 'Save');
     save.onclick = () => withBusy(save, async () => {
       try {
-        const body = { title: title.value, description: desc.value, cover_url: cover.value, visible: visible.checked, category_id: catSel.value };
+        const body = { title: title.value, description: desc.value, cover_url: cover.value, visible: visible.checked, category_id: catSel.value,
+          audio_url: audio.value, ...Object.fromEntries(Object.entries(song).map(([k, el]) => [k, el.value])) };
         const r = await api(isNew ? '/api/admin/albums' : `/api/admin/albums/${a.id}`, { method: isNew ? 'POST' : 'PUT', body });
         if (isNew) selAlbum = r.id;
         toast(isNew ? 'Album created — now upload its photos' : 'Album saved', 'success'); s.close(); reload();
@@ -109,7 +119,13 @@
     foot.push(h('div', { class: 'spacer' }), visible, save);
     const s = sheet({ title: isNew ? 'New album' : `Album — ${a.title}`, size: 'wide', foot,
       body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Album name', title), field('Category', catSel)), field('Description', desc),
-        field('Cover', cover, 'If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null) });
+        field('Cover', cover, 'Best size 1600 × 2000 (4:5). If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null,
+        h('div', { class: 'divider' }),
+        h('div', { class: 'panel-title', style: { marginBottom: 0 } }, h('span', { class: 'dot' }), 'Song — shown when the cover is flipped'),
+        h('div', { class: 'row' }, field('Song title', song.song_title), field('Artist', song.artist)),
+        h('div', { class: 'row' }, field('Release', song.release_date), field('Genre', song.genre)),
+        field('Song file', h('div', { style: { display: 'grid', gap: '8px' } }, audio, clearAudio), 'Visitors can play it on the back of the cover. A 30–60 second preview is enough.'),
+        field('Streaming link', song.link_url), field('Credits & info', song.credits)) });
   }
   function editCategory(c) {
     const isNew = !c;

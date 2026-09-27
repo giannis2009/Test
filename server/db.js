@@ -171,6 +171,14 @@ db.exec(`CREATE TABLE IF NOT EXISTS albums (
   title TEXT NOT NULL, description TEXT DEFAULT '', cover_url TEXT, sort INTEGER DEFAULT 0,
   visible INTEGER DEFAULT 1, created_at INTEGER NOT NULL
 )`);
+// Song info shown on the back of an album cover.
+{
+  const cols = all('PRAGMA table_info(albums)').map((c) => c.name);
+  for (const [c, t] of [['song_title', "TEXT DEFAULT ''"], ['artist', "TEXT DEFAULT ''"], ['release_date', "TEXT DEFAULT ''"], ['genre', "TEXT DEFAULT ''"],
+    ['audio_url', "TEXT DEFAULT ''"], ['link_url', "TEXT DEFAULT ''"], ['credits', "TEXT DEFAULT ''"]]) {
+    if (!cols.includes(c)) db.exec(`ALTER TABLE albums ADD COLUMN ${c} ${t}`);
+  }
+}
 if (!all('PRAGMA table_info(media)').some((c) => c.name === 'album_id')) {
   db.exec('ALTER TABLE media ADD COLUMN album_id INTEGER REFERENCES albums(id) ON DELETE CASCADE');
 }

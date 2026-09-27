@@ -142,7 +142,7 @@
       acc = h('button', { class: 'btn ghost account-btn', 'aria-label': 'Account' }, E.avatarEl(auth.user, 32));
       acc.onclick = () => E.popMenu(acc, (m) => {
         m.append(h('div', { class: 'menu-head' }, auth.user.email));
-        m.append(h('a', { class: 'menu-item', href: '/watch' }, iconEl('play'), 'My library'));
+        m.append(h('a', { class: 'menu-item', href: '/watch' }, iconEl('film'), 'My library'));
         m.append(h('button', { class: 'menu-item', onclick: () => { E.closeMenus(); openOrders(); } }, iconEl('receipt'), 'My orders'));
         if (auth.user.isAdmin) m.append(h('a', { class: 'menu-item', href: '/admin' }, iconEl('dashboard'), 'Admin panel'));
         m.append(h('div', { class: 'menu-sep' }));
@@ -247,6 +247,7 @@
   function setCategory(id, scroll) {
     cat = String(id);
     navSeg?.set(cat);
+    stopSong();
     swapContent(() => { renderGallery(); renderProducts(); });
     const c = S.site.categories.find((x) => String(x.id) === cat);
     $('#workLabel').textContent = c ? c.name : '';
@@ -283,21 +284,76 @@
       return E.reveal(tile, (i % 6) * 60);
     }));
   }
-  // Album card: the cover + title + photo count; opens the album page.
+  // Protected cover: painted as a CSS background under a transparent shield — no <img> to
+  // right-click, drag or long-press-save.
+  function protectedCover(url, cls = '') {
+    return h('div', { class: `pcover ${cls}`, style: url ? { backgroundImage: `url("${url}")` } : {}, role: 'img', 'aria-label': 'Cover art' },
+      url ? null : h('div', { class: 'ph', html: icon('image') }), h('span', { class: 'pcover-shield' }));
+  }
+  let nowPlaying = null; // only one song plays at a time
+  function stopSong() { if (nowPlaying) { nowPlaying.pause(); nowPlaying = null; } }
+  const fmtTime = (s) => (Number.isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '0:00');
+
+  // Album card that flips: cover in front, the song and its details on the back.
   function albumCard(a) {
     const cover = a.cover_url || a.first_url;
     const catName = S.site.categories.find((c) => c.id === a.category_id)?.name;
-    const card = h('a', { class: 'album', href: `/album/${a.id}` },
-      h('div', { class: 'album-cover' }, cover ? h('img', { src: cover, alt: '', loading: 'lazy' }) : h('div', { class: 'ph', html: icon('image') }),
-        null),
+    const hasSong = a.song_title || a.artist || a.audio_url;
+    // back side: player
+    let player = null;
+    if (a.audio_url) {
+      const audio = new Audio(); audio.preload = 'none'; audio.src = a.audio_url;
+      const btn = h('button', { type: 'button', class: 'fb-play', 'aria-label': 'Play preview', html: icon('play', 'fill') });
+      const fill = h('span', { class: 'fb-fill' });
+      const bar = h('div', { class: 'fb-bar', role: 'slider', 'aria-label': 'Seek' }, fill);
+      const cur = h('span', {}, '0:00'); const dur = h('span', {}, '');
+      const eq = h('span', { class: 'fb-eq', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i'));
+      const setIcon = () => { btn.innerHTML = icon(audio.paused ? 'play' : 'pause', 'fill'); card.classList.toggle('playing', !audio.paused); };
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        if (audio.paused) { if (nowPlaying && nowPlaying !== audio) nowPlaying.pause(); nowPlaying = audio; audio.play().catch(() => toast('Could not play this song', 'error')); }
+        else audio.pause();
+      };
+      audio.addEventListener('play', setIcon); audio.addEventListener('pause', setIcon); audio.addEventListener('ended', setIcon);
+      audio.addEventListener('loadedmetadata', () => { dur.textContent = fmtTime(audio.duration); });
+      audio.addEventListener('timeupdate', () => { fill.style.width = `${(audio.currentTime / audio.duration) * 100 || 0}%`; cur.textContent = fmtTime(audio.currentTime); });
+      bar.addEventListener('click', (e) => { e.stopPropagation(); const r = bar.getBoundingClientRect(); if (audio.duration) audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration; });
+      player = { el: h('div', { class: 'fb-player' }, btn, h('div', { class: 'fb-track' }, bar, h('div', { class: 'fb-times' }, cur, eq, dur))), audio };
+    }
+    const facts = [['Release', a.release_date], ['Genre', a.genre], ['Category', catName]].filter(([, v]) => v);
+    const back = h('div', { class: 'flip-face flip-back' },
+      h('div', { class: 'fb-bg', style: cover ? { backgroundImage: `url("${cover}")` } : {} }),
+      h('div', { class: 'fb-body' },
+        h('div', { class: 'fb-head' }, protectedCover(cover, 'fb-thumb'),
+          h('div', { class: 'fb-titles' }, h('span', { class: 'fb-kicker' }, hasSong ? 'Now playing' : 'About'),
+            h('strong', {}, a.song_title || a.title), a.artist ? h('span', {}, a.artist) : null)),
+        player ? player.el : null,
+        facts.length ? h('dl', { class: 'fb-facts' }, facts.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, v)))) : null,
+        a.credits || a.description ? h('p', { class: 'fb-credits' }, a.credits || a.description) : null,
+        h('div', { class: 'fb-acts' },
+          a.link_url ? h('a', { class: 'btn sm fb-btn', href: a.link_url, target: '_blank', rel: 'noopener noreferrer', onclick: (e) => e.stopPropagation() }, iconEl(/spotify/i.test(a.link_url) ? 'spotify' : /youtu/i.test(a.link_url) ? 'youtube' : 'external'), 'Listen') : null,
+          h('button', { type: 'button', class: 'btn sm fb-btn primary', onclick: (e) => { e.stopPropagation(); stopSong(); navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' }); } }, 'View album', iconEl('arrow')))));
+    const front = h('div', { class: 'flip-face flip-front' },
+      protectedCover(cover, 'album-cover'),
       h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, h('strong', {}, a.title),
-        h('span', { class: 'album-open' }, 'View album', iconEl('arrow'))));
-    card.onclick = (e) => { e.preventDefault(); const img = card.querySelector('img'); if (img) img.style.viewTransitionName = 'product-hero'; navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' }); };
-    tilt(card);
+        h('span', { class: 'album-open' }, iconEl(hasSong ? 'volume' : 'refresh'), hasSong ? 'Tap to play' : 'Tap for details')),
+      h('span', { class: 'flip-hint', 'aria-hidden': 'true', html: icon('refresh') }));
+    const inner = h('div', { class: 'flip-inner' }, front, back);
+    const card = h('article', { class: 'album flip', tabindex: '0', role: 'button', 'aria-label': `${a.title} — flip for details` }, inner);
+    const flip = (on) => {
+      const v = on ?? !card.classList.contains('flipped');
+      card.classList.toggle('flipped', v);
+      if (!v && player && !player.audio.paused) player.audio.pause();
+    };
+    card.addEventListener('click', () => flip());
+    card.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === card) { e.preventDefault(); flip(); } });
+    card.addEventListener('contextmenu', (e) => e.preventDefault());
+    card.addEventListener('dragstart', (e) => e.preventDefault());
     return card;
   }
   function renderAlbumPage(a) {
     pageCleanup?.();
+    stopSong();
     const view = $('#productView');
     const photos = S.media.filter((m) => m.album_id === a.id);
     const catObj = S.site.categories.find((c) => c.id === a.category_id);
@@ -308,7 +364,7 @@
       h('div', { class: 'pp-top' }, h('button', { class: 'btn sm', onclick: () => (history.state?.fromHome ? history.back() : navigate('/')) }, iconEl('chevron-left'), 'Back'),
         catObj ? h('button', { class: 'crumb', onclick: () => { navigate('/'); setCategory(String(catObj.id), true); } }, catObj.name) : null),
       h('header', { class: 'album-hero' },
-        cover ? h('img', { src: cover, alt: '', style: { viewTransitionName: 'product-hero' } }) : null,
+        cover ? (() => { const c = protectedCover(cover, 'album-hero-cover'); c.style.viewTransitionName = 'product-hero'; c.oncontextmenu = (e) => e.preventDefault(); return c; })() : null,
         h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
           a.description ? h('p', {}, a.description) : null)),
       photos.length ? h('div', { class: 'gallery album-grid' }, photos.map((m, i) => {
@@ -577,7 +633,7 @@
     const am = location.pathname.match(/^\/album\/(\d+)/);
     const p = m && S.products.find((x) => x.slug === decodeURIComponent(m[1]));
     const al = am && S.albums.find((x) => x.id === Number(am[1]));
-    $$('.p-media img, .album-cover img').forEach((img) => { img.style.viewTransitionName = ''; });
+    $$('.p-media img').forEach((img) => { img.style.viewTransitionName = ''; });
     if (p || al) {
       if (!$('#homeView').classList.contains('hidden')) homeScroll = window.scrollY;
       $('#homeView').classList.add('hidden'); $('#productView').classList.remove('hidden');
@@ -753,7 +809,7 @@
         order.keys.map((k) => h('div', {}, h('div', { class: 'muted', style: { fontSize: '13px', marginTop: '8px' } }, k.product_title),
           h('div', { class: 'k' }, h('span', {}, k.key), h('button', { class: 'btn icon sm ghost', 'aria-label': 'Copy key', html: icon('copy'), onclick: () => copy(k.key) }))))) : null]);
       s.setFoot([h('a', { class: 'btn', href: `/invoice/${encodeURIComponent(order.number)}`, target: '_blank' }, iconEl('invoice'), 'Invoice'),
-        h('a', { class: 'btn primary', style: { flex: 1 }, href: '/watch' }, iconEl('play'), 'Watch now')]);
+        h('a', { class: 'btn primary', style: { flex: 1 }, href: `/watch?order=${encodeURIComponent(order.number)}` }, iconEl('play'), 'Open my library')]);
       for (let i = 0; i < 26; i++) confetti();
     }
     function pending(order, instructions) {

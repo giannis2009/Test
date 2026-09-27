@@ -388,7 +388,9 @@
     const show = (v, name) => {
       preview.replaceChildren();
       if (v && !secure) {
-        preview.append(/\.(mp4|webm|mov|m4v)$/i.test(v) ? h('video', { src: v, muted: true, playsinline: true, autoplay: true, loop: true }) : h('img', { src: v, alt: '' }));
+        preview.append(/\.(mp4|webm|mov|m4v)$/i.test(v) ? h('video', { src: v, muted: true, playsinline: true, autoplay: true, loop: true })
+          : /\.(mp3|m4a|aac|wav|ogg|opus|flac)$/i.test(v) ? h('audio', { src: v, controls: true, style: { width: '100%' }, onclick: (e) => e.stopPropagation() })
+            : h('img', { src: v, alt: '' }));
       } else if (v && secure) preview.append(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text)' } }, iconEl('lock'), name || 'Private video uploaded'));
       else preview.append(iconEl('upload'), h('div', {}, label));
     };

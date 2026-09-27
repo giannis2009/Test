@@ -402,3 +402,65 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
   .ld-spot, .ld-glints, .ld-shine { display: none; }
   .ld-tag span { animation: none; opacity: 1; transform: none; filter: none; }
 }
+
+/* ---------- flip album cards (cover front, song on the back) ---------- */
+.pcover { position: relative; background: var(--bg-2) center / cover no-repeat; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.pcover .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+.pcover-shield { position: absolute; inset: 0; z-index: 1; background: transparent; }
+.album.flip { perspective: 1400px; background: none; border: 0; border-radius: calc(var(--radius) + 4px); overflow: visible; cursor: pointer; aspect-ratio: 4 / 5; }
+.album.flip:hover { box-shadow: none; }
+.flip-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .9s cubic-bezier(.3, 1.35, .45, 1); border-radius: inherit; }
+.album.flip:hover .flip-inner { transform: rotateY(-6deg) rotateX(3deg); }
+.album.flip.flipped .flip-inner { transform: rotateY(180deg); }
+.album.flip.flipped:hover .flip-inner { transform: rotateY(180deg); }
+.flip-face { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; border: 1px solid var(--border); box-shadow: 0 20px 50px -30px rgba(0, 0, 0, .6); }
+.flip-front .album-cover { position: absolute; inset: 0; aspect-ratio: auto; transition: transform 1.2s var(--ease); }
+.album.flip:hover .flip-front .album-cover { transform: scale(1.05); }
+.flip-front::after { content: ""; position: absolute; inset: 45% 0 0; z-index: 1; background: linear-gradient(transparent, rgba(8, 4, 14, .82)); pointer-events: none; }
+.flip-front .album-meta { z-index: 2; }
+.flip-hint { position: absolute; z-index: 2; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: rgba(10, 6, 16, .4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, .18); transition: transform .6s var(--spring); }
+.flip-hint .i { width: 16px; height: 16px; }
+.album.flip:hover .flip-hint { transform: rotate(180deg); }
+.flip-back { transform: rotateY(180deg); background: #0c0912; color: #fff; }
+.fb-bg { position: absolute; inset: -30px; background: center / cover no-repeat; filter: blur(36px) saturate(1.5) brightness(.45); transform: scale(1.15); }
+.fb-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10, 6, 16, .35), rgba(10, 6, 16, .85)); }
+.fb-body { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 20px; overflow-y: auto; scrollbar-width: none; }
+.fb-body::-webkit-scrollbar { display: none; }
+.fb-head { display: flex; gap: 14px; align-items: center; }
+.fb-thumb { width: 72px; aspect-ratio: 4 / 5; flex: none; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 24px rgba(0, 0, 0, .5); }
+.fb-titles { display: grid; gap: 2px; min-width: 0; }
+.fb-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-2); }
+.fb-titles strong { font-size: 19px; line-height: 1.2; letter-spacing: -.02em; }
+.fb-titles span:last-child:not(.fb-kicker) { color: rgba(255, 255, 255, .7); font-size: 14px; }
+.fb-player { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1); backdrop-filter: blur(10px); }
+.fb-play { width: 44px; height: 44px; flex: none; border-radius: 50%; border: 0; display: grid; place-items: center; background: #fff; color: #111; transition: transform .35s var(--spring); }
+.fb-play:hover { transform: scale(1.08); }
+.fb-play:active { transform: scale(.94); }
+.fb-play .i { width: 18px; height: 18px; }
+.album.playing .fb-play { background: var(--brand-grad); color: #fff; box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 25%, transparent); }
+.fb-track { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.fb-bar { position: relative; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .18); overflow: hidden; cursor: pointer; }
+.fb-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--brand-grad); border-radius: 5px; }
+.fb-times { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-family: var(--mono); color: rgba(255, 255, 255, .6); }
+.fb-eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; opacity: 0; transition: opacity .3s; }
+.fb-eq i { width: 3px; height: 30%; border-radius: 2px; background: var(--brand-2); }
+.album.playing .fb-eq { opacity: 1; }
+.album.playing .fb-eq i { animation: eq .9s ease-in-out infinite; }
+.album.playing .fb-eq i:nth-child(2) { animation-delay: -.3s; } .album.playing .fb-eq i:nth-child(3) { animation-delay: -.6s; } .album.playing .fb-eq i:nth-child(4) { animation-delay: -.15s; }
+@keyframes eq { 0%, 100% { height: 25%; } 50% { height: 100%; } }
+.fb-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin: 0; }
+.fb-facts div { padding: 9px 11px; border-radius: 12px; background: rgba(255, 255, 255, .06); }
+.fb-facts dt { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255, 255, 255, .5); }
+.fb-facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; }
+.fb-credits { font-size: 13px; line-height: 1.55; color: rgba(255, 255, 255, .72); white-space: pre-line; }
+.fb-acts { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+.fb-btn { flex: 1; min-width: 110px; }
+.fb-btn:not(.primary) { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .16); }
+.album-hero-cover { width: 100%; aspect-ratio: 4 / 5; border-radius: 26px; overflow: hidden; box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .6); }
+@media (prefers-reduced-motion: reduce) { .flip-inner { transition: none; } }
+@media (max-width: 700px) { .album-hero-cover { max-width: 260px; } }
+/* only the face that is showing takes clicks */
+.album.flip .flip-back { pointer-events: none; }
+.album.flip.flipped .flip-back { pointer-events: auto; }
+.album.flip.flipped .flip-front { pointer-events: none; }

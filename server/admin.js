@@ -21,13 +21,14 @@ const dateOrNull = (v) => { if (!v) return null; const t = new Date(v).getTime()
 /* ================= uploads ================= */
 const IMG = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
 const VID = /\.(mp4|webm|mov|m4v)$/i;
+const AUD = /\.(mp3|m4a|aac|wav|ogg|opus|flac)$/i;
 const storage = (dir) => multer.diskStorage({
   destination: dir,
   filename: (_req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname).toLowerCase()}`),
 });
 const publicUpload = multer({
   storage: storage(UPLOAD_DIR), limits: { fileSize: 300 * 1024 * 1024 },
-  fileFilter: (_req, f, cb) => cb(IMG.test(f.originalname) || VID.test(f.originalname) ? null : new HttpError(400, 'Only images or videos.'), true),
+  fileFilter: (_req, f, cb) => cb(IMG.test(f.originalname) || VID.test(f.originalname) || AUD.test(f.originalname) ? null : new HttpError(400, 'Only images, videos or audio.'), true),
 });
 const secureUpload = multer({
   storage: storage(SECURE_DIR), limits: { fileSize: 4 * 1024 * 1024 * 1024 },
@@ -37,7 +38,7 @@ const secureUpload = multer({
 router.post('/upload', publicUpload.single('file'), (req, res) => {
   if (!req.file) throw new HttpError(400, 'No file.');
   log(req, 'upload', req.file.originalname);
-  res.json({ url: `/uploads/${req.file.filename}`, type: VID.test(req.file.filename) ? 'video' : 'image' });
+  res.json({ url: `/uploads/${req.file.filename}`, type: VID.test(req.file.filename) ? 'video' : AUD.test(req.file.filename) ? 'audio' : 'image' });
 });
 router.post('/upload-secure', secureUpload.single('file'), (req, res) => {
   if (!req.file) throw new HttpError(400, 'No file.');
@@ -170,6 +171,14 @@ router.get('/albums', (req, res) => res.json({
     (SELECT url FROM media m WHERE m.album_id = a.id AND m.type = 'image' ORDER BY m.sort, m.id LIMIT 1) first_url
     FROM albums a WHERE a.category_id = ? ORDER BY a.sort, a.id`, int(req.query.category)),
 }));
+const SONG_FIELDS = { song_title: 120, artist: 120, release_date: 40, genre: 60, credits: 2000 };
+function saveSong(id, b, ex) {
+  const v = {};
+  for (const [k, max] of Object.entries(SONG_FIELDS)) v[k] = b[k] === undefined ? ex[k] ?? '' : str(b[k], max);
+  v.audio_url = b.audio_url === undefined ? ex.audio_url ?? '' : safeUrl(b.audio_url);
+  v.link_url = b.link_url === undefined ? ex.link_url ?? '' : safeUrl(b.link_url);
+  run(`UPDATE albums SET ${Object.keys(v).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`, ...Object.values(v), id);
+}
 router.post('/albums', (req, res) => {
   const b = req.body || {};
   const cat = get('SELECT id, name FROM categories WHERE id = ?', int(b.category_id));
@@ -178,6 +187,7 @@ router.post('/albums', (req, res) => {
   const sort = get('SELECT COALESCE(MAX(sort), -1) + 1 s FROM albums WHERE category_id = ?', cat.id).s;
   const r = run('INSERT INTO albums (category_id, title, description, cover_url, sort, visible, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     cat.id, title, str(b.description, 2000), safeUrl(b.cover_url), sort, b.visible === false ? 0 : 1, now());
+  saveSong(Number(r.lastInsertRowid), b, {});
   log(req, 'album.add', title, cat.name);
   res.json({ id: Number(r.lastInsertRowid) });
 });
@@ -190,6 +200,7 @@ router.put('/albums/:id', (req, res) => {
     catId, str(b.title ?? a.title, 120) || a.title, str(b.description ?? a.description, 2000),
     b.cover_url !== undefined ? safeUrl(b.cover_url) : a.cover_url, b.visible === undefined ? a.visible : bool(b.visible) ? 1 : 0, a.id);
   if (catId !== a.category_id) run('UPDATE media SET category_id = ? WHERE album_id = ?', catId, a.id);
+  saveSong(a.id, b, a);
   log(req, 'album.update', b.title || a.title);
   res.json({ ok: true });
 });

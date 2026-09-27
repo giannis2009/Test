@@ -50,12 +50,11 @@
     requestAnimationFrame(() => E.renderSignIn(slot, () => route()));
   }
 
-  /* ---------- key entry + library ---------- */
-  async function renderLibrary() {
+  /* ---------- key entry (used in the "Redeem a key" sheet) ---------- */
+  function keyEntry() {
     const boxes = [0, 1, 2, 3].map(() => h('input', { maxlength: '4', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', inputmode: 'text', 'aria-label': 'Key part' }));
     const keyin = h('div', { class: 'keyin' }, h('span', { class: 'pre' }, 'EZRO'), ...boxes.flatMap((b) => [h('span', { class: 'dash' }, '–'), b]));
     const unlock = h('button', { class: 'btn primary lg block', style: { marginTop: '18px' } }, iconEl('key'), 'Unlock video');
-
     const fillFrom = (text, start = 0) => {
       const chars = text.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^EZRO/, '');
       let i = start; let s = chars;
@@ -72,41 +71,138 @@
         if (boxes.every((x) => x.value.length === 4)) unlock.focus();
       });
       b.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !b.value && i > 0) { boxes[i - 1].focus(); }
+        if (e.key === 'Backspace' && !b.value && i > 0) boxes[i - 1].focus();
         if (e.key === 'Enter') unlock.click();
       });
       b.addEventListener('paste', (e) => { e.preventDefault(); fillFrom(e.clipboardData.getData('text'), i); });
     });
-    unlock.onclick = () => withBusy(unlock, async () => {
-      const key = `EZRO-${boxes.map((b) => b.value).join('-')}`;
-      if (boxes.some((b) => b.value.length !== 4)) { shake(); toast('Enter the full key', 'error'); return; }
-      try { const s = await api('/api/watch/open', { body: { key } }); play(s, { key }); }
-      catch (e) { shake(); fail(e); }
-    });
     const shake = () => { keyin.classList.remove('shake'); void keyin.offsetWidth; keyin.classList.add('shake'); };
+    const el = h('div', {}, keyin, unlock, h('p', { class: 'protect-note' }, iconEl('shield'), `Works only with ${auth.user.email}`));
+    return { el, boxes, unlock, shake };
+  }
+  function redeemSheet() {
+    const k = keyEntry();
+    const s = E.sheet({
+      body: [h('div', { style: { textAlign: 'center', padding: '6px 0 18px' } },
+        h('div', { class: 'w-icon sm', html: icon('key') }), h('h3', { style: { fontSize: '22px', marginTop: '14px' } }, 'Redeem a key'),
+        h('p', { class: 'muted', style: { marginTop: '6px' } }, 'Enter the key from your invoice email.')), k.el],
+    });
+    k.unlock.onclick = () => withBusy(k.unlock, async () => {
+      if (k.boxes.some((b) => b.value.length !== 4)) { k.shake(); toast('Enter the full key', 'error'); return; }
+      const key = `EZRO-${k.boxes.map((b) => b.value).join('-')}`;
+      try { const sess = await api('/api/watch/open', { body: { key } }); s.close(); play(sess, { key }); }
+      catch (e) { k.shake(); fail(e); }
+    });
+    setTimeout(() => k.boxes[0].focus(), 250);
+  }
 
-    const lib = h('div', { class: 'lib' }, [1, 2, 3].map(() => h('div', { class: 'skeleton', style: { height: '220px' } })));
-    app.replaceChildren(
-      h('div', { class: 'w-hero' }, h('div', { class: 'w-icon', html: icon('play') }), h('h1', {}, 'Video Review'),
-        h('p', {}, 'Enter the key from your invoice email, or pick a video from your library.')),
-      h('div', { class: 'w-card glass' }, h('p', { class: 'label', style: { textAlign: 'center', marginBottom: '14px' } }, 'Access key'), keyin, unlock,
-        h('p', { class: 'protect-note' }, iconEl('shield'), `Signed in as ${auth.user.email}`)),
-      h('div', { style: { marginTop: '48px' } }, h('h2', { style: { fontSize: '22px' } }, 'Your library'), lib));
-    setTimeout(() => boxes[0].focus(), 300);
+  /* ---------- library ---------- */
+  const money = (c, cur) => (c == null ? '' : E.money(c, cur));
+  const lib = { items: [], q: '', filter: 'all', sort: 'recent' };
+  async function renderLibrary() {
+    const highlight = params.get('order');
+    const first = (auth.user.name || auth.user.email).split(/[\s@]/)[0];
+    const head = h('header', { class: 'lb-head' },
+      h('div', { class: 'lb-hello' }, E.avatarEl(auth.user, 52),
+        h('div', {}, h('p', { class: 'eyebrow' }, 'Your library'), h('h1', {}, `Welcome back, ${first}`))),
+      h('div', { class: 'lb-head-acts' },
+        h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a key'),
+        h('a', { class: 'btn lg primary', href: '/#shop' }, iconEl('bag'), 'Shop')));
+    const stats = h('div', { class: 'lb-stats' });
+    const feature = h('div');
+    const tools = h('div', { class: 'lb-tools' });
+    const grid = h('div', { class: 'lb-grid' }, [1, 2, 3].map(() => h('div', { class: 'skeleton', style: { height: '330px', borderRadius: '24px' } })));
+    app.replaceChildren(h('div', { class: 'lb' }, head, stats, feature, tools, grid));
 
-    try {
-      const { items } = await api('/api/watch/library');
-      if (!items.length) { lib.replaceChildren(h('div', { class: 'empty', style: { gridColumn: '1/-1' } }, iconEl('film'), 'Nothing here yet. Your purchases appear here automatically.')); return; }
-      lib.replaceChildren(...items.map((it, i) => E.reveal(h('div', {
-        class: 'lib-item', tabindex: '0',
-        onclick: () => open(it), onkeydown: (e) => e.key === 'Enter' && open(it),
-      }, h('div', { class: 'cov' }, it.cover_url ? h('img', { src: it.cover_url, alt: '' }) : iconEl('film'), it.hasVideo ? h('span', { class: 'pl', html: icon('play') }) : null),
-      h('div', { class: 'meta' }, h('strong', {}, it.product_title), h('span', {}, it.key))), i * 60)));
-    } catch (e) { fail(e); }
-    async function open(it) {
-      if (!it.hasVideo) { toast('This purchase has no video attached yet.'); return; }
-      try { play(await api('/api/watch/open', { body: { licenseId: it.id } }), { licenseId: it.id }); } catch (e) { fail(e); }
+    try { lib.items = (await api('/api/watch/library')).items; } catch (e) { fail(e); lib.items = []; }
+    const items = lib.items;
+    if (!items.length) {
+      stats.remove(); tools.remove();
+      grid.replaceWith(h('div', { class: 'lb-empty' },
+        h('div', { class: 'w-icon', html: icon('film') }), h('h2', {}, 'Your library is empty'),
+        h('p', { class: 'muted' }, 'Everything you buy appears here instantly — ready to watch, with your invoice and key.'),
+        h('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' } },
+          h('a', { class: 'btn primary lg', href: '/#shop' }, 'Browse the shop'), h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a key'))));
+      return;
     }
+    const orders = new Set(items.map((i) => i.order_number)).size;
+    const sessions = items.reduce((n, i) => n + (i.views || 0), 0);
+    const since = Math.min(...items.map((i) => i.created_at));
+    stats.replaceChildren(...[
+      ['film', items.length, items.length === 1 ? 'Item' : 'Items'],
+      ['receipt', orders, orders === 1 ? 'Order' : 'Orders'],
+      ['eye', sessions, 'Watch sessions'],
+      ['calendar', E.fmtDate(since, { month: 'short', year: 'numeric' }), 'Member since'],
+    ].map(([ic, v, l]) => h('div', { class: 'lb-stat' }, h('span', { class: 'lb-stat-ic', html: icon(ic) }), h('div', {}, h('strong', {}, String(v)), h('span', {}, l)))));
+
+    // "Continue" hero: the most recently watched video, otherwise the newest purchase
+    const pick = [...items].filter((i) => i.hasVideo).sort((a, b) => (b.last_view_at || 0) - (a.last_view_at || 0))[0];
+    if (pick) {
+      const watched = !!pick.last_view_at;
+      feature.replaceChildren(E.reveal(h('section', { class: 'lb-feature' },
+        pick.cover_url ? h('div', { class: 'lb-feature-bg', style: { backgroundImage: `url("${pick.cover_url}")` } }) : null,
+        h('div', { class: 'lb-feature-body' },
+          h('span', { class: 'chip brand' }, iconEl(watched ? 'play' : 'sparkles'), watched ? 'Continue watching' : 'Ready to watch'),
+          h('h2', {}, pick.product_title), pick.subtitle ? h('p', {}, pick.subtitle) : null,
+          h('div', { class: 'lb-feature-meta' }, watched ? `Last watched ${E.timeAgo(pick.last_view_at)}` : `Purchased ${E.fmtDate(pick.created_at)}`),
+          h('div', { class: 'lb-feature-acts' },
+            h('button', { class: 'btn lg lb-play', onclick: () => open(pick) }, iconEl('play', 'fill'), watched ? 'Resume' : 'Play'),
+            pick.order_number ? h('a', { class: 'btn lg lb-glass', href: `/invoice/${encodeURIComponent(pick.order_number)}`, target: '_blank' }, iconEl('invoice'), 'Invoice') : null)),
+        pick.cover_url ? h('div', { class: 'lb-feature-art' }, h('img', { src: pick.cover_url, alt: '' })) : null)));
+    }
+
+    const search = h('div', { class: 'input-wrap lb-search' }, iconEl('search'),
+      E.input(lib.q, { placeholder: 'Search your library…', oninput: E.debounce((e) => { lib.q = e.target.value; draw(); }, 120) }));
+    const hasOther = items.some((i) => !i.hasVideo);
+    tools.replaceChildren(h('h2', {}, 'All purchases'), h('div', { class: 'lb-tools-r' }, search,
+      hasOther ? E.segmented([['all', 'All'], ['video', 'Videos'], ['other', 'Files']], lib.filter, (v) => { lib.filter = v; draw(); }) : null,
+      E.select([['recent', 'Newest first'], ['watched', 'Recently watched'], ['az', 'A → Z']], lib.sort, { onChange: (v) => { lib.sort = v; draw(); }, cls: 'sm' })));
+
+    function card(it, i) {
+      const isNew = highlight && it.order_number === highlight;
+      const keyTxt = h('span', { class: 'mono' }, it.key);
+      let revealed = false;
+      const eye = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Show key', title: 'Show key', html: icon('eye') });
+      eye.onclick = async (e) => {
+        e.stopPropagation();
+        if (revealed) { keyTxt.textContent = it.key; revealed = false; return; }
+        try { const { key } = await api('/api/watch/key', { body: { licenseId: it.id } }); keyTxt.textContent = key; revealed = true; } catch (err) { fail(err); }
+      };
+      const cp = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Copy key', title: 'Copy key', html: icon('copy') });
+      cp.onclick = async (e) => { e.stopPropagation(); try { const { key } = await api('/api/watch/key', { body: { licenseId: it.id } }); E.copy(key); } catch (err) { fail(err); } };
+      const el = h('article', { class: `lb-card ${isNew ? 'is-new' : ''}`, tabindex: '0', onkeydown: (e) => e.key === 'Enter' && e.target === el && open(it) },
+        h('div', { class: 'lb-cov', onclick: () => open(it) },
+          it.cover_url ? h('img', { src: it.cover_url, alt: '', loading: 'lazy' }) : h('div', { class: 'ph', html: icon(it.hasVideo ? 'film' : 'box') }),
+          h('div', { class: 'lb-cov-top' }, it.category ? h('span', { class: 'chip' }, it.category) : h('span'), isNew ? h('span', { class: 'chip brand' }, 'New') : null),
+          it.hasVideo ? h('span', { class: 'lb-playbtn', html: icon('play', 'fill') }) : null,
+          it.views ? h('span', { class: 'lb-watched' }, iconEl('eye'), `${it.views}`) : null),
+        h('div', { class: 'lb-body' },
+          h('h3', {}, it.product_title), it.subtitle ? h('p', { class: 'lb-sub' }, it.subtitle) : null,
+          it.deliver_note ? h('p', { class: 'lb-note' }, iconEl('gift'), it.deliver_note) : null,
+          h('div', { class: 'lb-key' }, iconEl('key'), keyTxt, h('span', { class: 'lb-key-acts' }, eye, cp)),
+          h('div', { class: 'lb-foot' },
+            h('div', { class: 'lb-meta' }, h('span', {}, E.fmtDate(it.created_at)), it.order_number ? h('span', {}, `#${it.order_number}`) : null,
+              it.total_cents != null ? h('span', {}, money(it.total_cents, it.currency)) : null),
+            h('div', { class: 'lb-acts' },
+              it.order_number ? h('a', { class: 'btn icon sm', href: `/invoice/${encodeURIComponent(it.order_number)}`, target: '_blank', 'aria-label': 'Invoice', title: 'Invoice', html: icon('invoice') }) : null,
+              it.hasVideo ? h('button', { class: 'btn sm primary', onclick: () => open(it) }, iconEl('play', 'fill'), 'Watch') : h('span', { class: 'chip' }, 'No video')))));
+      return E.reveal(el, (i % 6) * 60);
+    }
+    function draw() {
+      let list = items.filter((i) => lib.filter === 'all' || (lib.filter === 'video' ? i.hasVideo : !i.hasVideo));
+      const q = lib.q.trim().toLowerCase();
+      if (q) list = list.filter((i) => `${i.product_title} ${i.subtitle || ''} ${i.category || ''} ${i.order_number || ''}`.toLowerCase().includes(q));
+      if (lib.sort === 'az') list.sort((a, b) => a.product_title.localeCompare(b.product_title));
+      else if (lib.sort === 'watched') list.sort((a, b) => (b.last_view_at || 0) - (a.last_view_at || 0));
+      else list.sort((a, b) => b.created_at - a.created_at);
+      grid.replaceChildren(...(list.length ? list.map(card) : [h('div', { class: 'empty', style: { gridColumn: '1/-1' } }, iconEl('search'), 'Nothing matches your search.')]));
+    }
+    draw();
+    if (highlight) setTimeout(() => $('.lb-card.is-new')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+  }
+  async function open(it) {
+    if (!it.hasVideo) { toast('This purchase has no video attached yet.'); return; }
+    try { play(await api('/api/watch/open', { body: { licenseId: it.id } }), { licenseId: it.id }); } catch (e) { fail(e); }
   }
 
   /* ---------- protected player ---------- */

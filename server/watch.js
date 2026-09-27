@@ -24,10 +24,19 @@ const normalizeKey = (k) => str(k, 40).toUpperCase().replace(/[^A-Z0-9]/g, '').r
   .replace(/^EZRO(.{4})(.{4})(.{4})(.{4})$/, 'EZRO-$1-$2-$3-$4');
 
 router.get('/library', requireUser, (req, res) => {
-  const rows = all(`SELECT l.id, l.key, l.product_title, l.created_at, l.views, p.cover_url, p.slug, p.video_source
-                    FROM licenses l LEFT JOIN products p ON p.id = l.product_id
+  const rows = all(`SELECT l.id, l.key, l.product_title, l.created_at, l.views, l.last_view_at, p.cover_url, p.slug, p.video_source,
+                           p.subtitle, p.deliver_note, p.category_id, c.name category, o.number order_number, o.total_cents, o.currency, o.method_label
+                    FROM licenses l LEFT JOIN products p ON p.id = l.product_id LEFT JOIN categories c ON c.id = p.category_id
+                    LEFT JOIN orders o ON o.id = l.order_id
                     WHERE l.email = ? AND l.revoked = 0 ORDER BY l.created_at DESC`, req.user.email);
-  res.json({ items: rows.map((r) => ({ ...r, key: `${r.key.slice(0, 10)}••••-••••`, hasVideo: !!r.video_source && r.video_source !== 'none' })) });
+  res.json({ items: rows.map(({ video_source, ...r }) => ({ ...r, key: `${r.key.slice(0, 10)}••••-••••`, hasVideo: !!video_source && video_source !== 'none' })) });
+});
+
+// Full key, only for its owner (for the copy button in the library).
+router.post('/key', requireUser, rateLimit({ max: 30 }), (req, res) => {
+  const lic = get('SELECT key, email FROM licenses WHERE id = ? AND revoked = 0', Number(req.body?.licenseId));
+  if (!lic || lic.email !== req.user.email) throw new HttpError(404, 'Not found.');
+  res.json({ key: lic.key });
 });
 
 router.post('/open', requireUser, rateLimit({ max: 12 }), (req, res) => {
