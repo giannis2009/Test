@@ -230,8 +230,9 @@ router.post('/media', (req, res) => {
   const sort = b.position === 'first' ? (get('SELECT COALESCE(MIN(sort), 1) - 1 s FROM media WHERE category_id = ?', cat.id).s)
     : get('SELECT COALESCE(MAX(sort), -1) + 1 s FROM media WHERE category_id = ?', cat.id).s;
   const album = int(b.album_id) ? get('SELECT id FROM albums WHERE id = ? AND category_id = ?', int(b.album_id), cat.id) : null;
-  const r = run('INSERT INTO media (category_id, album_id, type, url, poster, title, caption, sort, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    cat.id, album ? album.id : null, type, url, safeUrl(b.poster), str(b.title, 120), str(b.caption, 500), sort, now());
+  const r = run('INSERT INTO media (category_id, album_id, type, url, poster, title, caption, sort, created_at, song_title, artist, audio_url, link_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    cat.id, album ? album.id : null, type, url, safeUrl(b.poster), str(b.title, 120), str(b.caption, 500), sort, now(),
+    str(b.song_title, 120), str(b.artist, 120), safeUrl(b.audio_url), safeUrl(b.link_url));
   log(req, 'media.add', cat.name, `${type}: ${str(b.title, 120) || url}`);
   res.json({ id: Number(r.lastInsertRowid) });
 });
@@ -242,8 +243,10 @@ router.put('/media/:id', (req, res) => {
   const catId = b.category_id ? int(b.category_id) : m.category_id;
   let albumId = b.album_id === undefined ? m.album_id : int(b.album_id) || null;
   if (albumId && !get('SELECT 1 FROM albums WHERE id = ? AND category_id = ?', albumId, catId)) albumId = null;
-  run('UPDATE media SET category_id = ?, album_id = ?, title = ?, caption = ?, poster = ? WHERE id = ?',
-    catId, albumId, str(b.title ?? m.title, 120), str(b.caption ?? m.caption, 500), b.poster !== undefined ? safeUrl(b.poster) : m.poster, m.id);
+  run('UPDATE media SET category_id = ?, album_id = ?, title = ?, caption = ?, poster = ?, song_title = ?, artist = ?, audio_url = ?, link_url = ? WHERE id = ?',
+    catId, albumId, str(b.title ?? m.title, 120), str(b.caption ?? m.caption, 500), b.poster !== undefined ? safeUrl(b.poster) : m.poster,
+    str(b.song_title ?? m.song_title, 120), str(b.artist ?? m.artist, 120),
+    b.audio_url !== undefined ? safeUrl(b.audio_url) : m.audio_url, b.link_url !== undefined ? safeUrl(b.link_url) : m.link_url, m.id);
   log(req, 'media.update', m.title || m.url, catId !== m.category_id ? 'moved category' : '');
   res.json({ ok: true });
 });

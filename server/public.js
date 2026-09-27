@@ -42,7 +42,7 @@ router.get('/site', (_req, res) => {
 
 router.get('/media', (_req, res) => {
   res.json({
-    media: all(`SELECT m.id, m.category_id, m.album_id, m.type, m.url, m.poster, m.title, m.caption FROM media m
+    media: all(`SELECT m.id, m.category_id, m.album_id, m.type, m.url, m.poster, m.title, m.caption, m.song_title, m.artist, m.audio_url, m.link_url FROM media m
       JOIN categories c ON c.id = m.category_id LEFT JOIN albums a ON a.id = m.album_id
       WHERE c.visible = 1 AND (m.album_id IS NULL OR a.visible = 1) ORDER BY m.sort, m.id`),
     albums: all(`SELECT a.id, a.category_id, a.title, a.description, a.cover_url, a.song_title, a.artist, a.release_date, a.genre, a.audio_url, a.link_url, a.credits,

@@ -417,7 +417,6 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .album-credits { font-size: 14px !important; }
 @media (max-width: 760px) { .album-hero { grid-template-columns: 1fr; gap: 22px; } .album-hero-cover { max-width: 320px; } }
 .album-grid { margin-top: 10px; }
-.song { display: grid; gap: 12px; margin-top: 6px; max-width: 580px; }
 .sp-player { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); }
 .sp-play { width: 48px; height: 48px; flex: none; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--brand-grad); color: #fff; box-shadow: var(--shadow-brand); transition: transform .35s var(--spring); }
 .sp-play:hover { transform: scale(1.07); } .sp-play:active { transform: scale(.93); }
@@ -455,3 +454,46 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .pp-ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--surface-2); border-top-color: var(--brand); animation: spin .9s linear infinite; }
 .pp-ring .i { width: 28px; height: 28px; }
 .pp-confirm h3 { font-size: 20px; }
+
+/* ---------- covers with a song + the song panel on the left ---------- */
+.has-song { cursor: pointer; }
+.song-badge { position: absolute; z-index: 4; left: 12px; top: 12px; height: 30px; min-width: 30px; padding: 0 9px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  color: #fff; background: rgba(12, 8, 20, .55); backdrop-filter: blur(10px) saturate(1.4); -webkit-backdrop-filter: blur(10px) saturate(1.4); border: 1px solid rgba(255, 255, 255, .14);
+  pointer-events: none; transition: background .35s var(--ease), transform .45s var(--spring); }
+.song-badge .sb-ic { display: grid; } .song-badge .sb-ic .i { width: 14px; height: 14px; }
+.sb-eq { display: none; gap: 2px; align-items: flex-end; height: 12px; }
+.sb-eq i { width: 3px; height: 40%; border-radius: 2px; background: #fff; animation: eq .9s ease-in-out infinite; }
+.sb-eq i:nth-child(2) { animation-delay: -.3s; } .sb-eq i:nth-child(3) { animation-delay: -.6s; }
+.has-song:hover .song-badge { transform: scale(1.08); }
+.is-current .song-badge { background: var(--brand-grad); border-color: transparent; }
+.is-playing .song-badge .sb-eq { display: inline-flex; }
+.is-current::before { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 0 2px var(--brand-2); }
+.album-hero-cover.has-song { position: relative; }
+
+.song-panel { position: fixed; z-index: 60; left: 22px; bottom: 22px; width: min(350px, calc(100vw - 32px)); max-height: calc(100vh - 120px); overflow: auto;
+  display: grid; gap: 14px; padding: 16px; border-radius: 24px; border: 1px solid var(--border); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .6), var(--shadow);
+  opacity: 0; transform: translateX(-40px) scale(.96); transition: opacity .4s var(--ease), transform .55s var(--spring); }
+.song-panel.in { opacity: 1; transform: none; }
+.song-panel.out { opacity: 0; transform: translateX(-40px) scale(.96); pointer-events: none; }
+.spn-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); cursor: pointer; transition: transform .3s var(--spring), background .2s; }
+.spn-close:hover { transform: rotate(90deg); background: var(--hover); color: var(--text); }
+.spn-close .i { width: 14px; height: 14px; }
+.spn-top { display: flex; gap: 14px; align-items: center; padding-right: 34px; }
+.spn-cover { width: 76px; height: 76px; flex: none; border-radius: 14px; overflow: hidden; box-shadow: 0 14px 30px -14px rgba(0, 0, 0, .6); }
+.spn-text { min-width: 0; display: grid; gap: 3px; }
+.spn-text strong { font-size: 18px; letter-spacing: -.02em; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.spn-artist { color: var(--text-2); font-size: 14px; }
+.spn-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-2); }
+.spn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-2); box-shadow: 0 0 0 0 var(--brand-2); animation: spnPulse 1.8s ease-out infinite; }
+@keyframes spnPulse { 0% { box-shadow: 0 0 0 0 rgba(180, 145, 220, .6); } 100% { box-shadow: 0 0 0 9px rgba(180, 145, 220, 0); } }
+.spn-facts { display: flex; gap: 6px; flex-wrap: wrap; }
+.song-panel .sp-player { box-shadow: none; background: var(--surface); padding: 10px 12px; }
+.song-panel .sp-play { width: 42px; height: 42px; }
+.spn-credits { margin: 0; font-size: 13px; color: var(--muted); white-space: pre-line; }
+.spn-open { justify-self: start; }
+@media (max-width: 560px) {
+  .song-panel { left: 10px; right: 10px; bottom: 10px; width: auto; border-radius: 22px; transform: translateY(40px); }
+  .song-panel.out { transform: translateY(40px); }
+  .spn-cover { width: 60px; height: 60px; }
+}
+@media (prefers-reduced-motion: reduce) { .song-panel, .song-panel.out { transition: opacity .2s; transform: none; } .sb-eq i, .spn-dot { animation: none; } }

@@ -45,7 +45,8 @@
           h('span', { style: { display: 'flex', gap: '4px' } }, h('button', { 'aria-label': 'Edit', html: icon('edit'), onclick: () => editMedia(m, categories, loadMedia) }),
             h('button', { 'aria-label': 'Delete', html: icon('trash'), onclick: async () => { if (await E.confirmDialog('Delete this item?', '', { ok: 'Delete', danger: true })) { await api(`/api/admin/media/${m.id}`, { method: 'DELETE' }).catch(fail); loadMedia(); } } }))),
           h('div', { class: 'cap' }, m.title || (m.type === 'video' ? 'Video' : 'Image'))),
-        m.type === 'video' ? h('span', { class: 'chip vid' }, iconEl('film')) : null)));
+        m.type === 'video' ? h('span', { class: 'chip vid' }, iconEl('film')) : null,
+        m.audio_url || m.link_url ? h('span', { class: 'chip vid', title: m.song_title || 'Has a song', style: { right: 'auto', left: '8px' } }, iconEl('music')) : null)));
       E.dragSort({ containers: [grid], item: '.mitem', handle: '.handle', onDrop: () => A.reorder('media', $$('.mitem', grid).map((x) => Number(x.dataset.id))) });
       const fileIn = h('input', { type: 'file', accept: 'image/*,video/*', multiple: true, class: 'hidden' });
       const bar = h('div', { class: 'progress hidden', style: { marginTop: '10px' } }, h('div'));
@@ -119,13 +120,13 @@
     foot.push(h('div', { class: 'spacer' }), visible, save);
     const s = sheet({ title: isNew ? 'New album' : `Album — ${a.title}`, size: 'wide', foot,
       body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Album name', title), field('Category', catSel)), field('Description', desc),
-        field('Cover', cover, 'Best size 1600 × 2000 (4:5). If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null,
+        field('Cover', cover, 'Best size 3000 × 3000 (square). If you leave it empty, the first photo of the album is used.'), pick ? field('Or pick one of its photos', pick) : null,
         h('div', { class: 'divider' }),
-        h('div', { class: 'panel-title', style: { marginBottom: 0 } }, h('span', { class: 'dot' }), 'Song — shown when the cover is flipped'),
+        h('div', { class: 'panel-title', style: { marginBottom: 0 } }, h('span', { class: 'dot' }), 'Song — plays when the album cover is clicked'),
         h('div', { class: 'row' }, field('Song title', song.song_title), field('Artist', song.artist)),
         h('div', { class: 'row' }, field('Release', song.release_date), field('Genre', song.genre)),
-        field('Song file', h('div', { style: { display: 'grid', gap: '8px' } }, audio, clearAudio), 'Visitors can play it on the back of the cover. A 30–60 second preview is enough.'),
-        field('Spotify link', song.link_url, 'Paste a Spotify track or album link — it shows as a player on the album page, in the site’s theme.'), field('Credits & info', song.credits)) });
+        field('Song file', h('div', { style: { display: 'grid', gap: '8px' } }, audio, clearAudio), 'Starts playing right away when a visitor clicks the album cover.'),
+        field('Spotify link', song.link_url, 'Optional — shows the Spotify player in the song panel, in the site’s theme.'), field('Credits & info', song.credits)) });
   }
   function editCategory(c) {
     const isNew = !c;
@@ -153,16 +154,28 @@
     const caption = textarea(m.caption, { placeholder: 'Caption (optional)', style: { minHeight: '70px' } });
     const cat = select(categories.map((c) => ({ value: c.id, label: c.name, icon: c.icon })), m.category_id);
     const poster = E.uploadBox({ value: m.poster || '', label: 'Optional poster image for videos', hint: '1920×1080 px (16:9)' });
+    // the song of this cover — clicking the cover on the site plays it and opens the song panel
+    const songTitle = input(m.song_title, { placeholder: 'e.g. Quema Light' });
+    const artist = input(m.artist, { placeholder: 'e.g. Artist name' });
+    const audio = E.uploadBox({ value: m.audio_url || '', accept: 'audio/*', label: 'Song file', hint: 'MP3, M4A or WAV' });
+    const clearAudio = h('button', { type: 'button', class: 'btn sm', onclick: () => audio.set('') }, 'Remove song');
+    const spotify = input(m.link_url, { placeholder: 'https://open.spotify.com/track/…', type: 'url' });
+    const songBody = () => ({ song_title: songTitle.value, artist: artist.value, audio_url: audio.value, link_url: spotify.value });
     const save = h('button', { class: 'btn primary' }, 'Save');
     save.onclick = () => withBusy(save, async () => {
       try {
-        if (isNew) await api('/api/admin/media', { body: { category_id: cat.value, album_id: String(cat.value) === String(m.category_id) ? m.album_id : null, url: url.value, title: title.value, caption: caption.value, poster: poster.value } });
-        else await api(`/api/admin/media/${m.id}`, { method: 'PUT', body: { category_id: cat.value, title: title.value, caption: caption.value, poster: poster.value } });
+        if (isNew) await api('/api/admin/media', { body: { category_id: cat.value, album_id: String(cat.value) === String(m.category_id) ? m.album_id : null, url: url.value, title: title.value, caption: caption.value, poster: poster.value, ...songBody() } });
+        else await api(`/api/admin/media/${m.id}`, { method: 'PUT', body: { category_id: cat.value, title: title.value, caption: caption.value, poster: poster.value, ...songBody() } });
         toast('Saved', 'success'); s.close(); reload();
       } catch (e) { fail(e); }
     });
-    const s = sheet({ title: isNew ? 'Add by link' : 'Edit media', foot: [h('button', { class: 'btn', onclick: () => s.close() }, 'Cancel'), save],
-      body: h('div', { class: 'form' }, isNew ? field('Link', url) : null, field('Category', cat, isNew ? null : 'Move it to another category'), field('Title', title), field('Caption', caption), m.type === 'video' || isNew ? field('Poster', poster) : null) });
+    const s = sheet({ title: isNew ? 'Add by link' : 'Edit media', size: 'wide', foot: [h('button', { class: 'btn', onclick: () => s.close() }, 'Cancel'), save],
+      body: h('div', { class: 'form' }, isNew ? field('Link', url) : null, field('Category', cat, isNew ? null : 'Move it to another category'), field('Title', title), field('Caption', caption), m.type === 'video' || isNew ? field('Poster', poster) : null,
+        h('div', { class: 'divider' }),
+        h('div', { class: 'panel-title', style: { marginBottom: 0 } }, h('span', { class: 'dot' }), 'Song — plays when this cover is clicked'),
+        h('div', { class: 'row' }, field('Song title', songTitle), field('Artist', artist)),
+        field('Song file', h('div', { style: { display: 'grid', gap: '8px' } }, audio, clearAudio), 'Starts playing right away when a visitor clicks the cover.'),
+        field('Spotify link', spotify, 'Optional — shows the Spotify player in the song panel.')) });
   }
 
   /* ================= Socials ================= */

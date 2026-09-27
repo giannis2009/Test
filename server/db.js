@@ -183,6 +183,12 @@ if (!all('PRAGMA table_info(media)').some((c) => c.name === 'album_id')) {
   db.exec('ALTER TABLE media ADD COLUMN album_id INTEGER REFERENCES albums(id) ON DELETE CASCADE');
 }
 
+// Each cover (photo) can carry its own song — clicking it plays the music.
+{
+  const cols = all('PRAGMA table_info(media)').map((c) => c.name);
+  for (const c of ['song_title', 'artist', 'audio_url', 'link_url']) if (!cols.includes(c)) db.exec(`ALTER TABLE media ADD COLUMN ${c} TEXT DEFAULT ''`);
+}
+
 // Profile edits (name / photo) that Google sign-in must not overwrite.
 {
   const cols = all('PRAGMA table_info(users)').map((c) => c.name);
