@@ -172,8 +172,8 @@ function setSetting(key, value) {
 /* ---------- seed ---------- */
 function seed() {
   if (!get('SELECT 1 FROM categories LIMIT 1')) {
-    const cats = [['COVER ART', 'cover-art', 'image'], ['3D ART', '3d-art', 'cube'], ['BRANDING', 'branding', 'pen'], ['PRODUCTS', 'products', 'bag']];
-    cats.forEach(([n, s, i], idx) => run('INSERT INTO categories (name, slug, icon, sort, created_at) VALUES (?, ?, ?, ?, ?)', n, s, i, idx, now()));
+    const cats = [['COVER ART', 'cover-art', 'image', 'square'], ['3D ART', '3d-art', 'cube', 'original'], ['BRANDING', 'branding', 'pen', 'square'], ['PRODUCTS', 'products', 'bag', 'square']];
+    cats.forEach(([n, s, i, shape], idx) => run('INSERT INTO categories (name, slug, icon, sort, created_at, shape) VALUES (?, ?, ?, ?, ?, ?)', n, s, i, idx, now(), shape));
   }
   if (!get('SELECT 1 FROM socials LIMIT 1')) {
     [['YouTube', 'youtube'], ['TikTok', 'tiktok'], ['Instagram', 'instagram'], ['Discord', 'discord'], ['X', 'x']]

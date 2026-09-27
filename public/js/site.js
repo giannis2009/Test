@@ -285,7 +285,8 @@
     ab.replaceChildren(...albums.map((a, i) => E.reveal(albumCard(a), (i % 6) * 60)),
       ...items.map((m, i) => E.reveal(coverTile(m, items, i), ((albums.length + i) % 6) * 60)));
     ab.classList.toggle('hidden', !albums.length && !items.length);
-    ab.classList.toggle('masonry', cat !== 'all' && catShape(cat) === 'original');
+    ab.classList.toggle('justified', cat !== 'all' && catShape(cat) === 'original');
+    justify(ab);
     // with a category chosen, a section that has nothing in it is hidden instead of showing an empty box
     const hideWork = cat !== 'all' && !albums.length && !items.length && S.products.some((p) => String(p.category_id) === cat);
     $('#work').classList.toggle('hidden', hideWork);
@@ -299,9 +300,44 @@
   // "original size" categories: the card takes the real proportions of its image / video
   function natural(tile, url, isVideo) {
     if (!url) return;
-    const set = (w, hgt) => { if (w && hgt) tile.style.setProperty('--ar', `${w} / ${hgt}`); };
+    const set = (w, hgt) => { if (w && hgt && tile.dataset.ar !== String(w / hgt)) { tile.dataset.ar = String(w / hgt); relayout(tile.parentElement); } };
     if (isVideo) { const v = tile.querySelector('video'); v?.addEventListener('loadedmetadata', () => set(v.videoWidth, v.videoHeight), { once: true }); if (v?.videoWidth) set(v.videoWidth, v.videoHeight); return; }
     const im = new Image(); im.onload = () => set(im.naturalWidth, im.naturalHeight); im.src = url;
+  }
+  /* Justified rows (like Google Photos / Behance): every row has the same height and fills the full width,
+     and every image or video keeps its real proportions — no ragged columns, no giant tiles. */
+  const pending = new Set();
+  function relayout(box) {
+    if (!box?.classList?.contains('justified') || pending.has(box)) return;
+    pending.add(box);
+    requestAnimationFrame(() => { pending.delete(box); justify(box); });
+  }
+  const boxRO = 'ResizeObserver' in window ? new ResizeObserver((es) => es.forEach((e) => relayout(e.target))) : null;
+  function justify(box) {
+    const items = [...box.children].filter((el) => el.classList.contains('album'));
+    if (!box.classList.contains('justified')) { items.forEach((el) => { el.style.width = ''; el.style.height = ''; }); return; }
+    boxRO?.observe(box);
+    const W = box.clientWidth;
+    if (!W) return;
+    const gap = W < 560 ? 8 : 14;
+    const target = W < 560 ? 175 : W < 900 ? 230 : 280; // ideal row height
+    const place = (row, hgt) => row.forEach(({ el, r }) => { el.style.width = `${(r * hgt - 0.05).toFixed(2)}px`; el.style.height = `${hgt.toFixed(2)}px`; });
+    let row = []; let sum = 0;
+    const rowH = (n, total) => (W - gap * (n - 1)) / total;
+    items.forEach((el) => {
+      // very tall or very wide files are gently cropped so one file can't take over a row
+      const r = Math.min(2.2, Math.max(0.56, Number(el.dataset.ar) || 1));
+      row.push({ el, r }); sum += r;
+      const hgt = rowH(row.length, sum);
+      if (hgt > target) return;
+      // the row is full: end it with or without this item, whichever lands closer to the ideal height
+      const without = row.length > 1 ? rowH(row.length - 1, sum - r) : Infinity;
+      if (Math.abs(without - target) < Math.abs(hgt - target)) {
+        const last = row.pop(); place(row, without); row = [last]; sum = last.r;
+      } else { place(row, hgt); row = []; sum = 0; }
+    });
+    // the last row keeps the normal height instead of stretching a single image across the page
+    if (row.length) place(row, Math.min(target, (W - gap * (row.length - 1)) / sum));
   }
   function coverTile(m, list, i) {
     const catName = S.site.categories.find((c) => c.id === m.category_id)?.name;
@@ -510,7 +546,7 @@
           [a.release_date, a.genre].some(Boolean) ? h('div', { class: 'album-facts' }, [a.release_date, a.genre].filter(Boolean).map((t) => h('span', { class: 'chip' }, t))) : null,
           a.description ? h('p', {}, a.description) : null,
           a.credits ? h('p', { class: 'album-credits' }, a.credits) : null)),
-      photos.length ? h('div', { class: `albums album-grid ${catShape(a.category_id) === 'original' ? 'masonry' : ''}` }, photos.map((m, i) => E.reveal(coverTile(m, photos, i), (i % 6) * 50))) : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
+      photos.length ? (() => { const g = h('div', { class: `albums album-grid ${catShape(a.category_id) === 'original' ? 'justified' : ''}` }, photos.map((m, i) => E.reveal(coverTile(m, photos, i), (i % 6) * 50))); requestAnimationFrame(() => justify(g)); return g; })() : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
       others.length ? h('div', { class: 'pp-more' }, h('h2', {}, 'More albums'), h('div', { class: 'albums' }, others.map(albumCard))) : null));
     pageCleanup = null;
     E.applyTexts(view, 'home');
