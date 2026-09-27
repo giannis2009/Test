@@ -9,8 +9,8 @@ fi
 echo "Node.js $(node -v) found."
 [ -d node_modules ] || npm install || { read -p "npm install failed. Press Enter"; exit 1; }
 if [ ! -f .env ]; then
-  read -p "Your Google email (becomes the admin): " ADMIN
-  printf "PORT=3000\nPUBLIC_URL=http://localhost:3000\nDEV_LOGIN=1\nADMIN_EMAILS=%s\n# Fill these in later - see .env.example\nGOOGLE_CLIENT_ID=\nPAYPAL_ENV=sandbox\nPAYPAL_CLIENT_ID=\nPAYPAL_CLIENT_SECRET=\n" "$ADMIN" > .env
+  echo "The admin panel uses a secret username + password - open /admin, the setup code is shown below."
+  printf "PORT=3000\nPUBLIC_URL=http://localhost:3000\nDEV_LOGIN=1\n# Fill these in later - see .env.example\nGOOGLE_CLIENT_ID=\nPAYPAL_ENV=sandbox\nPAYPAL_CLIENT_ID=\nPAYPAL_CLIENT_SECRET=\n" > .env
 fi
 (sleep 2; open http://localhost:3000) &
 npm start

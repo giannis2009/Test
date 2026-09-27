@@ -25,8 +25,10 @@ services:
         generateValue: true
       - key: PUBLIC_URL
         sync: false          # e.g. https://ezro.onrender.com or your own domain
-      - key: ADMIN_EMAILS
-        sync: false          # your Google email
+      - key: ADMIN_USERNAME
+        sync: false          # your secret admin username (first start only)
+      - key: ADMIN_PASSWORD
+        sync: false          # at least 10 characters (first start only)
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: PAYPAL_ENV

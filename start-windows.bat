@@ -38,7 +38,7 @@ if not exist node_modules (
 rem ---- 3. .env for local testing ------------------------------------------
 if not exist .env (
   echo [3/4] First run - creating .env for local testing.
-  set /p ADMIN=   Your Google email ^(becomes the admin^): 
+  echo    The admin panel uses a secret username + password - open /admin, the setup code is shown below.
   call :writeenv
 ) else (
   echo [3/4] .env already exists.
@@ -63,7 +63,6 @@ exit /b 0
 > .env echo PORT=3000
 >> .env echo PUBLIC_URL=http://localhost:3000
 >> .env echo DEV_LOGIN=1
->> .env echo ADMIN_EMAILS=%ADMIN%
 >> .env echo # Fill these in later for real Google login / PayPal / email - see .env.example
 >> .env echo GOOGLE_CLIENT_ID=
 >> .env echo PAYPAL_ENV=sandbox

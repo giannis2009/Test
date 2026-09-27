@@ -67,8 +67,8 @@
     side = h('aside', { class: 'side' },
       h('a', { class: 'side-brand', href: '/', title: 'Open site' }, h('img', { src: Admin.site?.appearance?.logoUrl || '/assets/logo.webp', alt: 'Ezro' }), h('small', {}, 'Admin')),
       NAV.map(([group, items]) => [h('div', { class: 'side-group' }, group), items.map(([id, label, ic]) => h('a', { class: 'nav-i', href: `#/${id}`, dataset: { id } }, iconEl(ic), h('span', {}, label)))]),
-      h('div', { class: 'side-foot' }, E.avatarEl(Admin.me, 34), h('div', { class: 'who' }, h('strong', {}, Admin.me.name || 'Admin'), h('span', {}, Admin.me.email)),
-        E.themeButton(), h('button', { class: 'btn icon ghost', 'aria-label': 'Sign out', html: icon('logout'), onclick: async () => { await E.auth.logout(); location.href = '/'; } })));
+      h('div', { class: 'side-foot' }, E.avatarEl(Admin.me, 34), h('div', { class: 'who' }, h('strong', {}, Admin.me.username), h('span', {}, Admin.me.role === 'owner' ? 'Owner' : 'Admin')),
+        E.themeButton(), h('button', { class: 'btn icon ghost', 'aria-label': 'Sign out', title: 'Sign out', html: icon('logout'), onclick: signOut })));
     main = h('main', { class: 'main' });
     const mtop = h('div', { class: 'mobile-top glass' }, h('button', { class: 'btn icon ghost', 'aria-label': 'Menu', html: icon('menu'), onclick: openSide }), h('img', { src: Admin.site?.appearance?.logoUrl || '/assets/logo.webp', alt: '' }), h('span', { style: { flex: 1 } }), E.themeButton());
     root.replaceChildren(h('div', { class: 'shell' }, side, h('div', {}, mtop, main)));
@@ -91,6 +91,7 @@
       const nodes = await page({ setCleanup: (fn) => { current.cleanup = fn; } });
       main.replaceChildren(...[nodes].flat());
     } catch (e) {
+      if (e.status === 401) { loginScreen('expired'); return; }
       fail(e);
       main.replaceChildren(h('div', { class: 'page' }, h('div', { class: 'empty' }, e.message)));
     }
@@ -107,27 +108,126 @@
     } catch { /* ignore */ }
   }
 
+  async function signOut() {
+    await api('/api/admin-auth/logout', { body: {} }).catch(() => {});
+    window.removeEventListener('hashchange', route);
+    loginScreen('signedout');
+  }
   async function boot() {
-    try { await E.auth.load(); } catch (e) { fail(e); }
-    Admin.me = E.auth.user;
-    if (!Admin.me) return gate('Sign in to the admin panel', true);
-    if (!Admin.me.isAdmin) return gate(`${Admin.me.email} is not an admin.`, false);
+    let st;
+    try { st = await api('/api/admin-auth/status'); } catch (e) { fail(e); return; }
+    if (!st.admin) return loginScreen(st.setup ? 'setup' : null);
+    Admin.me = { ...st.admin, name: st.admin.username, email: st.admin.role };
     Admin.site = await api('/api/public/site').catch(() => null);
     if (Admin.site) { E.setCurrency(Admin.site.checkout.currency); E.applyAppearance({ ...Admin.site.appearance, orbs: false, grid: false }); }
     shell();
+    window.removeEventListener('hashchange', route);
     window.addEventListener('hashchange', route);
     route();
   }
-  function gate(msg, canSignIn) {
-    const slot = h('div', { style: { marginTop: '18px' } });
-    root.replaceChildren(h('div', { style: { minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '20px' } },
-      h('div', { class: 'panel', style: { width: 'min(440px,100%)', textAlign: 'center', padding: '32px' } },
-        h('img', { src: '/assets/logo.webp', alt: 'Ezro', style: { width: '150px', margin: '0 auto 18px' } }),
-        h('h2', { style: { fontSize: '22px' } }, msg),
-        h('p', { class: 'muted', style: { marginTop: '6px' } }, canSignIn ? 'Use an admin Google account.' : 'Ask the owner to add your email in Admins & Security.'),
-        slot,
-        !canSignIn ? h('button', { class: 'btn', style: { marginTop: '16px' }, onclick: async () => { await E.auth.logout(); boot(); } }, 'Use another account') : null)));
-    if (canSignIn) requestAnimationFrame(() => E.renderSignIn(slot, () => boot()));
+
+  /* ---------- login panel: secret username + password (and the one-time owner setup) ---------- */
+  // strength 0–4 from length and character variety
+  Admin.pwStrength = (pw) => {
+    if (!pw) return 0;
+    let sc = 0;
+    if (pw.length >= 10) sc++; if (pw.length >= 14) sc++;
+    if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) sc++;
+    if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) sc++;
+    if (pw.length < 10) sc = Math.min(sc, 1);
+    return Math.min(4, sc);
+  };
+  Admin.pwField = (placeholder, { autocomplete = 'current-password', meter = false } = {}) => {
+    const inp = h('input', { class: 'input', type: 'password', placeholder, autocomplete, spellcheck: 'false', maxlength: '200' });
+    const eye = h('button', { type: 'button', class: 'lg-eye', 'aria-label': 'Show password', html: icon('eye') });
+    eye.onclick = () => { const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; eye.classList.toggle('on', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); inp.focus(); };
+    const caps = h('div', { class: 'lg-caps hidden' }, iconEl('arrow'), 'Caps Lock is on');
+    const onKey = (e) => { if (e.getModifierState) caps.classList.toggle('hidden', !e.getModifierState('CapsLock')); };
+    inp.addEventListener('keydown', onKey); inp.addEventListener('keyup', onKey);
+    const wrap = h('div', { class: 'lg-field' }, h('span', { class: 'lg-ic', html: icon('lock') }), inp, eye);
+    let bar = null;
+    if (meter) {
+      const LBL = ['Too short', 'Weak', 'Okay', 'Strong', 'Very strong'];
+      const segs = [0, 1, 2, 3].map(() => h('i'));
+      const txt = h('span', {}, '');
+      bar = h('div', { class: 'lg-meter', dataset: { s: '0' } }, h('div', { class: 'lg-segs' }, segs), txt);
+      inp.addEventListener('input', () => { const sc = Admin.pwStrength(inp.value); bar.dataset.s = String(inp.value ? Math.max(1, sc) : 0); txt.textContent = inp.value ? LBL[sc] : ''; });
+    }
+    return { el: h('div', { class: 'lg-group' }, wrap, caps, bar), input: inp };
+  };
+  function loginScreen(mode) {
+    const setup = mode === 'setup';
+    document.title = setup ? 'Create admin login — Ezro' : 'Admin — Ezro';
+    const err = h('div', { class: 'lg-error', role: 'alert', 'aria-live': 'assertive' });
+    const showErr = (m) => { err.replaceChildren(iconEl('shield'), h('span', {}, m)); err.classList.add('on'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); };
+    const user = h('input', { class: 'input', placeholder: 'Username', autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', maxlength: '32' });
+    const userField = h('div', { class: 'lg-field' }, h('span', { class: 'lg-ic', html: icon('user') }), user);
+    const pw = Admin.pwField(setup ? 'Create a password' : 'Password', { autocomplete: setup ? 'new-password' : 'current-password', meter: setup });
+    const pw2 = setup ? Admin.pwField('Repeat the password', { autocomplete: 'new-password' }) : null;
+    const code = setup ? h('input', { class: 'input mono', placeholder: 'XXXX-XXXX', autocomplete: 'one-time-code', maxlength: '9', style: { letterSpacing: '.18em', textTransform: 'uppercase' } }) : null;
+    const remember = h('label', { class: 'lg-remember' }, h('input', { type: 'checkbox' }), h('span', { class: 'lg-check', html: icon('check') }), 'Keep me signed in for 14 days');
+    const go = h('button', { class: 'btn primary lg block lg-go', type: 'submit' }, h('span', {}, setup ? 'Create admin login' : 'Sign in'), iconEl('arrow'));
+    let lockT = null;
+    const lock = (secs) => {
+      clearInterval(lockT); go.disabled = true;
+      const end = Date.now() + secs * 1000;
+      const tick = () => {
+        const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+        go.firstChild.textContent = left ? `Locked · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'Sign in';
+        if (!left) { clearInterval(lockT); go.disabled = false; err.classList.remove('on'); }
+      };
+      tick(); lockT = setInterval(tick, 1000);
+    };
+    const form = h('form', { class: 'lg-form', novalidate: true },
+      setup ? h('div', { class: 'lg-group' }, h('label', { class: 'lg-label' }, 'Setup code'), h('div', { class: 'lg-field' }, h('span', { class: 'lg-ic', html: icon('key') }), code),
+        h('p', { class: 'lg-hint' }, 'Shown once in the server window, and saved in ', h('code', {}, 'data/ADMIN-SETUP-CODE.txt'), '.')) : null,
+      h('div', { class: 'lg-group' }, setup ? h('label', { class: 'lg-label' }, 'Username') : null, userField,
+        setup ? h('p', { class: 'lg-hint' }, '3–32 letters or numbers. Keep it secret — it is half of your login.') : null),
+      h('div', { class: 'lg-group' }, setup ? h('label', { class: 'lg-label' }, 'Password') : null, pw.el),
+      pw2 ? pw2.el : null,
+      err,
+      setup ? null : remember,
+      go);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (go.disabled) return;
+      err.classList.remove('on');
+      if (setup && !code.value.trim()) { showErr('Enter the setup code.'); code.focus(); return; }
+      if (!user.value.trim()) { showErr('Enter your username.'); user.focus(); return; }
+      if (!pw.input.value) { showErr('Enter your password.'); pw.input.focus(); return; }
+      if (setup && pw.input.value !== pw2.input.value) { showErr('The two passwords are not the same.'); pw2.input.focus(); return; }
+      go.classList.add('loading'); go.disabled = true;
+      try {
+        const body = setup ? { code: code.value, username: user.value.trim(), password: pw.input.value }
+          : { username: user.value.trim(), password: pw.input.value, remember: remember.querySelector('input').checked };
+        await api(setup ? '/api/admin-auth/setup' : '/api/admin-auth/login', { body });
+        card.classList.add('ok');
+        go.replaceChildren(iconEl('check'), h('span', {}, setup ? 'Account created' : 'Welcome'));
+        setTimeout(() => { location.hash = location.hash || '#/dashboard'; boot(); }, 520);
+      } catch (ex) {
+        go.classList.remove('loading'); go.disabled = false;
+        pw.input.value = ''; if (pw2) pw2.input.value = '';
+        showErr(ex.message);
+        const m = /(\d+) min/.exec(ex.message); if (ex.status === 429 && m) lock(Number(m[1]) * 60);
+        pw.input.focus();
+      }
+    };
+    const note = mode === 'expired' ? 'Your session ended. Sign in again.' : mode === 'signedout' ? 'You are signed out.' : null;
+    const card = h('div', { class: 'lg-card' },
+      h('div', { class: 'lg-top' },
+        h('div', { class: 'lg-badge', html: icon(setup ? 'sparkles' : 'shield') }),
+        h('img', { class: 'lg-logo', src: '/assets/logo.webp', alt: 'Ezro' })),
+      h('h1', {}, setup ? 'Create your admin login' : 'Admin'),
+      h('p', { class: 'lg-sub' }, setup ? 'First time here — choose the secret username and password that will open this panel.' : 'Restricted area. Sign in with your admin username and password.'),
+      note ? h('div', { class: 'lg-note' }, iconEl('clock'), note) : null,
+      form,
+      h('div', { class: 'lg-foot' }, iconEl('lock'), 'Encrypted session · every attempt is logged'));
+    root.replaceChildren(h('div', { class: 'lg-page' },
+      h('div', { class: 'lg-orb a' }), h('div', { class: 'lg-orb b' }), h('div', { class: 'lg-grid' }),
+      h('a', { class: 'lg-back', href: '/' }, iconEl('chevron-left'), 'Back to site'),
+      h('div', { class: 'lg-theme' }, E.themeButton()),
+      card));
+    requestAnimationFrame(() => (setup ? code : user).focus());
   }
 
   /* ---------- bar chart (single series, hover tooltip) ---------- */
@@ -276,28 +376,84 @@
 
   /* ================= Admins & Security ================= */
   Admin.pages.security = async () => {
-    const [a, sec] = await Promise.all([api('/api/admin/admins'), api('/api/admin/settings/security')]);
-    const email = E.input('', { type: 'email', placeholder: 'name@gmail.com' });
+    const [acc, sec] = await Promise.all([api('/api/admin/accounts'), api('/api/admin/settings/security')]);
+    const { me, canManage, accounts, sessions } = acc;
+
+    // ---- my login: username + password (current password always required)
+    const uname = E.input(me.username, { autocomplete: 'username', maxlength: '32', spellcheck: 'false' });
+    const cur = Admin.pwField('Current password');
+    const npw = Admin.pwField('New password (leave empty to keep it)', { autocomplete: 'new-password', meter: true });
+    const npw2 = Admin.pwField('Repeat the new password', { autocomplete: 'new-password' });
+    const saveMe = h('button', { class: 'btn primary' }, iconEl('check'), 'Save my login');
+    saveMe.onclick = () => withBusy(saveMe, async () => {
+      if (!cur.input.value) { toast('Enter your current password', 'error'); cur.input.focus(); return; }
+      if (npw.input.value && npw.input.value !== npw2.input.value) { toast('The new passwords are not the same', 'error'); npw2.input.focus(); return; }
+      if (uname.value.trim() === me.username && !npw.input.value) { toast('Nothing to change'); return; }
+      try {
+        const r = await api('/api/admin/account', { method: 'PUT', body: { currentPassword: cur.input.value, username: uname.value.trim(), newPassword: npw.input.value || undefined } });
+        toast(npw.input.value ? 'Saved — other devices were signed out' : 'Saved', 'success');
+        Admin.me.username = r.username; Admin.me.name = r.username; shell(); route();
+      } catch (e) { fail(e); cur.input.value = ''; cur.input.focus(); }
+    });
+
+    // ---- accounts
+    const nu = E.input('', { placeholder: 'username', autocomplete: 'off', maxlength: '32', spellcheck: 'false' });
+    const np = Admin.pwField('Password for this admin', { autocomplete: 'new-password', meter: true });
+    let role = 'admin';
+    const roleSeg = E.segmented([['admin', 'Admin'], ['owner', 'Owner']], role, (v) => { role = v; });
     const add = h('button', { class: 'btn primary' }, iconEl('plus'), 'Add admin');
-    add.onclick = () => withBusy(add, async () => { try { await api('/api/admin/admins', { body: { email: email.value } }); toast('Admin added', 'success'); Admin.refresh(); } catch (e) { fail(e); } });
+    add.onclick = () => withBusy(add, async () => {
+      try { await api('/api/admin/accounts', { body: { username: nu.value.trim(), password: np.input.value, role } }); toast('Admin added — give them the username and password privately', 'success', 4500); Admin.refresh(); } catch (e) { fail(e); }
+    });
+    const resetPw = async (a) => {
+      const f = Admin.pwField('New password', { autocomplete: 'new-password', meter: true });
+      const ok = h('button', { class: 'btn primary' }, 'Set password');
+      const sh = E.sheet({ title: `New password for ${a.username}`, body: h('div', { class: 'form' }, h('p', { class: 'muted', style: { margin: 0, fontSize: '13px' } }, 'They are signed out everywhere and use the new password next time.'), f.el),
+        foot: [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => sh.close() }, 'Cancel'), ok] });
+      ok.onclick = () => withBusy(ok, async () => { try { await api(`/api/admin/accounts/${a.id}/password`, { method: 'PUT', body: { password: f.input.value } }); toast('Password changed', 'success'); sh.close(); } catch (e) { fail(e); } });
+    };
+    const list = h('div', { class: 'list' }, accounts.map((a) => h('div', { class: 'lrow' },
+      h('div', { class: 'ic', html: icon(a.role === 'owner' ? 'shield' : 'user') }),
+      h('div', { class: 'tt' }, h('strong', {}, a.username, a.id === me.id ? ' (you)' : ''),
+        h('span', {}, `${a.role === 'owner' ? 'Owner' : 'Admin'} · ${a.last_login ? `last sign-in ${E.timeAgo(a.last_login)}` : 'never signed in'}`)),
+      canManage && a.id !== me.id ? h('button', { class: 'btn icon sm ghost', 'aria-label': 'Set password', title: 'Set a new password', html: icon('key'), onclick: () => resetPw(a) }) : null,
+      canManage && a.id !== me.id ? h('button', { class: 'btn icon sm ghost danger', 'aria-label': 'Remove', html: icon('trash'), onclick: async () => {
+        if (await E.confirmDialog(`Remove ${a.username}?`, 'They are signed out and can no longer open the admin panel.', { ok: 'Remove', danger: true })) { await api(`/api/admin/accounts/${a.id}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); }
+      } }) : null)));
+
+    // ---- my devices
+    const uaName = (ua = '') => `${/Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser'} · ${/Windows/.test(ua) ? 'Windows' : /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Unknown'}`;
+    const others = h('button', { class: 'btn', disabled: sessions.length < 2 }, iconEl('logout'), 'Sign out other devices');
+    others.onclick = () => withBusy(others, async () => { try { const r = await api('/api/admin/account/signout-others', { body: {} }); toast(`${r.count} device(s) signed out`, 'success'); Admin.refresh(); } catch (e) { fail(e); } });
+
     const blur = E.toggle(sec.blurOnFocusLoss, 'Black out the video when the window loses focus');
     const dev = E.toggle(sec.blockDevtools, 'Black out when developer tools are opened');
     const maxv = E.input(sec.maxViewsPerKey, { type: 'number', min: '0' });
     const save = h('button', { class: 'btn primary' }, 'Save security');
     save.onclick = () => Admin.saveSettings('security', { blurOnFocusLoss: blur.checked, blockDevtools: dev.checked, maxViewsPerKey: Number(maxv.value) || 0 }, save);
-    return [Admin.head('Admins & Security', 'Who can open this panel, and how paid videos are protected.'),
+    return [Admin.head('Admins & Security', 'Your secret admin login, who else can open this panel, and how paid videos are protected.'),
       h('div', { class: 'page' }, h('div', { class: 'split' },
-        Admin.panel('Admins',
-          h('p', { class: 'desc' }, 'Owners are set in the server .env (ADMIN_EMAILS) and can add or remove other admins.'),
-          h('div', { class: 'list' },
-            a.owners.map((o) => h('div', { class: 'lrow' }, h('div', { class: 'ic', html: icon('shield') }), h('div', { class: 'tt' }, h('strong', {}, o), h('span', {}, 'Owner')))),
-            a.admins.map((x) => h('div', { class: 'lrow' }, h('div', { class: 'ic', html: icon('user') }), h('div', { class: 'tt' }, h('strong', {}, x.email), h('span', {}, `Added ${E.fmtDate(x.added_at)} by ${x.added_by || '—'}`)),
-              a.canManage ? h('button', { class: 'btn icon sm ghost danger', 'aria-label': 'Remove', html: icon('trash'), onclick: async () => { if (await E.confirmDialog('Remove admin?', x.email, { ok: 'Remove', danger: true })) { await api(`/api/admin/admins/${encodeURIComponent(x.email)}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); } } }) : null))),
-          a.canManage ? h('div', { class: 'input-group', style: { marginTop: '14px' } }, email, add) : null),
-        Admin.panel('Video protection', h('div', { class: 'form' }, blur, dev,
-          E.field('Maximum viewing sessions per key', maxv, '0 = unlimited. A session counts once per 30 minutes.'),
-          h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
-          h('div', { class: 'form-actions' }, save))))),
+        h('div', { class: 'stack' },
+          Admin.panel('Your login', h('div', { class: 'form' },
+            h('p', { class: 'desc', style: { margin: 0 } }, 'The admin panel opens only with this username and password — never with an email. Keep both secret.'),
+            E.field('Username', uname, '3–32 letters, numbers, dot, dash or underscore.'),
+            E.field('Current password', cur.el),
+            E.field('New password', h('div', { style: { display: 'grid', gap: '10px' } }, npw.el, npw2.el), 'At least 10 characters. Changing it signs out every other device.'),
+            h('div', { class: 'form-actions' }, saveMe))),
+          Admin.panel('Your devices', h('div', { class: 'list' }, sessions.map((x) => h('div', { class: 'lrow' },
+            h('div', { class: 'ic', html: icon(/iPhone|Android/.test(x.ua) ? 'phone' : 'globe') }),
+            h('div', { class: 'tt' }, h('strong', {}, uaName(x.ua), x.current ? h('span', { class: 'chip good', style: { marginLeft: '8px', display: 'inline-flex', width: 'auto', verticalAlign: 'middle' } }, 'This device') : null),
+              h('span', {}, `${x.ip || '—'} · active ${E.timeAgo(x.last_seen || x.created_at)}`))))),
+            h('div', { class: 'form-actions', style: { marginTop: '12px' } }, others))),
+        h('div', { class: 'stack' },
+          Admin.panel('Admin accounts',
+            h('p', { class: 'desc' }, canManage ? 'Owners can add admins, set their passwords and remove them.' : 'Only an owner can add or remove admins.'),
+            list,
+            canManage ? h('div', { class: 'form', style: { marginTop: '16px' } }, h('div', { class: 'row' }, E.field('Username', nu), E.field('Role', roleSeg)), E.field('Password', np.el), h('div', { class: 'form-actions' }, add)) : null),
+          Admin.panel('Video protection', h('div', { class: 'form' }, blur, dev,
+            E.field('Maximum viewing sessions per key', maxv, '0 = unlimited. A session counts once per 30 minutes.'),
+            h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
+            h('div', { class: 'form-actions' }, save)))))),
     ];
   };
 
@@ -341,7 +497,7 @@
           h('div', { class: 'input-group', style: { flexWrap: 'wrap' } }, uEmail, uGo)),
         Admin.panel('Choose what to clear', h('div', { class: 'list' }, rows),
           h('div', { class: 'input-group', style: { marginTop: '18px', flexWrap: 'wrap' } }, all, h('span', { style: { flex: 1 } }), confirmIn, go))]
-        : h('div', { class: 'empty' }, iconEl('lock'), 'Only the owner (ADMIN_EMAILS in .env) can reset data.'))];
+        : h('div', { class: 'empty' }, iconEl('lock'), 'Only an owner admin can reset data.'))];
   };
 
   boot();

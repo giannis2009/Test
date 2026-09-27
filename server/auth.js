@@ -9,14 +9,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const DEV_LOGIN = process.env.DEV_LOGIN === '1' && process.env.NODE_ENV !== 'production';
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
-const ownerEmails = () => (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-function isAdmin(email) {
-  if (!email) return false;
-  const e = email.toLowerCase();
-  return ownerEmails().includes(e) || !!get('SELECT 1 FROM admins WHERE email = ?', e);
-}
-const isOwner = (email) => !!email && ownerEmails().includes(email.toLowerCase());
-
 function parseCookies(header = '') {
   const out = {};
   for (const part of header.split(';')) {
@@ -43,7 +35,6 @@ function sessionMiddleware(req, _res, next) {
                      WHERE s.token_hash = ? AND s.expires_at > ?`, hash, now());
     if (row) {
       req.user = { id: row.id, email: row.email, name: row.name, picture: row.picture };
-      req.user.isAdmin = isAdmin(row.email);
       req.sessionHash = hash;
     }
   }
@@ -51,7 +42,6 @@ function sessionMiddleware(req, _res, next) {
 }
 
 const requireUser = (req, res, next) => (req.user ? next() : res.status(401).json({ error: 'Please sign in with Google first.' }));
-const requireAdmin = (req, res, next) => (req.user?.isAdmin ? next() : res.status(req.user ? 403 : 401).json({ error: 'Admins only.' }));
 
 function startSession(req, res, profile) {
   const email = profile.email.toLowerCase();
@@ -79,7 +69,7 @@ const router = express.Router();
 
 router.get('/config', (_req, res) => res.json({ googleClientId: GOOGLE_CLIENT_ID, devLogin: DEV_LOGIN }));
 
-router.get('/me', (req, res) => res.json({ user: req.user || null }));
+router.get('/me', (req, res) => res.json({ user: req.user ? { ...req.user, isAdmin: !!req.admin } : null, admin: !!req.admin }));
 
 router.post('/google', rateLimit({ max: 20 }), wrap(async (req, res) => {
   if (!googleClient) throw new HttpError(503, 'Google sign-in is not configured (GOOGLE_CLIENT_ID).');
@@ -93,7 +83,7 @@ router.post('/google', rateLimit({ max: 20 }), wrap(async (req, res) => {
   }
   if (!payload?.email || !payload.email_verified) throw new HttpError(401, 'Your Google email is not verified.');
   startSession(req, res, payload);
-  res.json({ ok: true, user: { email: payload.email, name: payload.name, picture: payload.picture, isAdmin: isAdmin(payload.email) } });
+  res.json({ ok: true, user: { email: payload.email, name: payload.name, picture: payload.picture, isAdmin: !!req.admin } });
 }));
 
 // Local testing only: enabled with DEV_LOGIN=1 and never in production.
@@ -151,4 +141,4 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-module.exports = { router, sessionMiddleware, requireUser, requireAdmin, isAdmin, isOwner, ownerEmails, all };
+module.exports = { router, sessionMiddleware, requireUser };

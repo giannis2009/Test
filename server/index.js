@@ -17,6 +17,7 @@ const express = require('express');
 const helmet = require('helmet');
 const { UPLOAD_DIR } = require('./db');
 const auth = require('./auth');
+const adminAuth = require('./adminauth');
 const shop = require('./shop');
 const watch = require('./watch');
 const publicApi = require('./public');
@@ -52,6 +53,7 @@ app.use(helmet({
 
 app.use(express.json({ limit: '1mb' }));
 app.use(auth.sessionMiddleware);
+app.use(adminAuth.adminSession);
 
 // CSRF guard: state-changing API calls must come from this site.
 app.use('/api', (req, res, next) => {
@@ -63,6 +65,7 @@ app.use('/api', (req, res, next) => {
 });
 
 app.use('/api/auth', auth.router);
+app.use('/api/admin-auth', adminAuth.router);
 app.use('/api/public', publicApi.router);
 app.use('/api/shop', shop.router);
 app.use('/api/watch', watch.router);

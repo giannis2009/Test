@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const multer = require('multer');
 const { db, all, get, run, tx, now, getSetting, setSetting, DEFAULTS, UPLOAD_DIR, SECURE_DIR } = require('./db');
-const { requireAdmin, isOwner, ownerEmails } = require('./auth');
+const { requireAdmin, isOwnerReq, adminUsernames, accounts } = require('./adminauth');
 const { fulfil } = require('./shop');
 const { send, smtpConfigured } = require('./mailer');
 const paypal = require('./paypal');
@@ -13,6 +13,7 @@ const { log, str, int, bool, cents, slugify, safeUrl, hex, money, licenseKey, Ht
 
 const router = express.Router();
 router.use(requireAdmin);
+router.use(accounts);
 
 const J = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const day = (t) => new Date(t).toISOString().slice(0, 10);
@@ -545,7 +546,7 @@ router.get('/tasks', (req, res) => {
   const me = req.user.email;
   res.json({
     tasks: all("SELECT * FROM tasks WHERE visibility = 'team' OR created_by = ? OR assignee = ? ORDER BY sort, id", me, me),
-    people: [...new Set([...ownerEmails(), ...all('SELECT email FROM admins').map((a) => a.email)])],
+    people: adminUsernames(),
   });
 });
 function taskFromBody(b, ex = {}) {
@@ -596,24 +597,17 @@ const RESETS = {
   },
   customers: {
     label: 'Customer accounts',
-    // admins keep their accounts; everyone else is signed out and removed together with their orders
-    run: () => {
-      const keep = [...ownerEmails(), ...all('SELECT email FROM admins').map((a) => a.email)];
-      const ph = keep.map(() => '?').join(',') || "''";
-      run(`DELETE FROM licenses WHERE email NOT IN (${ph})`, ...keep);
-      run(`DELETE FROM orders WHERE email NOT IN (${ph})`, ...keep);
-      run(`DELETE FROM users WHERE email NOT IN (${ph})`, ...keep);
-    },
+    // admin logins are separate (username + password), so every customer account goes, with its orders and codes
+    run: () => { run('DELETE FROM licenses'); run('DELETE FROM orders'); run('DELETE FROM sessions'); run('DELETE FROM users'); },
   },
   tasks: { label: 'Tasks', run: () => run('DELETE FROM tasks') },
   notify: { label: '“Notify me” sign-ups', run: () => run('DELETE FROM product_notify') },
 };
 // Reset one person by email: their account, sessions, orders, codes and notify sign-ups.
 router.post('/reset-user', (req, res) => {
-  if (!isOwner(req.user.email)) throw new HttpError(403, 'Only the owner can reset users.');
+  if (!isOwnerReq(req)) throw new HttpError(403, 'Only an owner can reset users.');
   const email = str(req.body?.email, 200).toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Enter a valid email.');
-  if (isOwner(email)) throw new HttpError(400, 'The owner account cannot be reset.');
   const u = get('SELECT id FROM users WHERE email = ?', email);
   const found = { orders: get('SELECT COUNT(*) n FROM orders WHERE email = ?', email).n, codes: get('SELECT COUNT(*) n FROM licenses WHERE email = ?', email).n, account: !!u };
   if (!found.account && !found.orders && !found.codes) throw new HttpError(404, 'No data found for this email.');
@@ -628,7 +622,7 @@ router.post('/reset-user', (req, res) => {
   res.json({ ok: true, found });
 });
 router.get('/reset', (req, res) => res.json({
-  canReset: isOwner(req.user.email),
+  canReset: isOwnerReq(req),
   counts: {
     logs: get('SELECT COUNT(*) n FROM logs').n, analytics: get('SELECT COUNT(*) n FROM views').n,
     orders: get('SELECT COUNT(*) n FROM orders').n, customers: get('SELECT COUNT(*) n FROM users').n,
@@ -636,32 +630,13 @@ router.get('/reset', (req, res) => res.json({
   },
 }));
 router.post('/reset', (req, res) => {
-  if (!isOwner(req.user.email)) throw new HttpError(403, 'Only the owner can reset data.');
+  if (!isOwnerReq(req)) throw new HttpError(403, 'Only an owner can reset data.');
   if (str(req.body?.confirm, 10) !== 'RESET') throw new HttpError(400, 'Type RESET to confirm.');
   const what = (Array.isArray(req.body?.what) ? req.body.what : []).filter((k) => RESETS[k]);
   if (!what.length) throw new HttpError(400, 'Choose what to reset.');
   tx(() => what.forEach((k) => RESETS[k].run()));
   if (what.includes('analytics') || what.includes('orders')) db.exec('VACUUM');
   log(req, 'admin.reset', what.map((k) => RESETS[k].label).join(', '));
-  res.json({ ok: true });
-});
-
-/* ================= admins ================= */
-router.get('/admins', (req, res) => res.json({
-  owners: ownerEmails(), admins: all('SELECT * FROM admins ORDER BY added_at'), canManage: isOwner(req.user.email),
-}));
-router.post('/admins', (req, res) => {
-  if (!isOwner(req.user.email)) throw new HttpError(403, 'Only the owner can manage admins.');
-  const email = str(req.body?.email, 200).toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'Enter a valid Google email.');
-  run('INSERT OR IGNORE INTO admins (email, added_at, added_by) VALUES (?, ?, ?)', email, now(), req.user.email);
-  log(req, 'admin.add', email);
-  res.json({ ok: true });
-});
-router.delete('/admins/:email', (req, res) => {
-  if (!isOwner(req.user.email)) throw new HttpError(403, 'Only the owner can manage admins.');
-  run('DELETE FROM admins WHERE email = ?', str(req.params.email, 200).toLowerCase());
-  log(req, 'admin.remove', req.params.email);
   res.json({ ok: true });
 });
 

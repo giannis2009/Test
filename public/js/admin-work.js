@@ -28,7 +28,7 @@
 
   A.pages.tasks = async () => {
     const { tasks, people } = await api('/api/admin/tasks');
-    const me = A.me.email;
+    const me = A.me.username;
     const statsEl = h('div', { class: 'stats' });
     const board = h('div', { class: 'board' });
     const bodies = {};

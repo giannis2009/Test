@@ -12,7 +12,7 @@ Portfolio, shop, secure video delivery and a full admin panel for **Ezro**.
 |---|---|
 | `/` | Logo, socials, portfolio ανά κατηγορία (COVER ART, 3D ART, BRANDING, PRODUCTS), shop, καλάθι και checkout |
 | `/watch` | **Profile**: φωτογραφία και όνομα, τα προϊόντα του πελάτη, video και Download panel |
-| `/admin` | Admin Panel |
+| `/admin` | Admin Panel — μπαίνεις **μόνο** με κρυφό username και password |
 
 **Αγορά, βήμα προς βήμα:**
 1. Ο πελάτης κάνει login με Google.
@@ -34,7 +34,7 @@ Portfolio, shop, secure video delivery and a full admin panel for **Ezro**.
 - **Texts:** γραμματοσειρά, αλλαγή ή διαγραφή **οποιουδήποτε** κειμένου (και με κλικ πάνω στη σελίδα).
 - **Appearance:** χρώματα, θέμα, στρογγυλάδα, logo, favicon, με live preview.
 - **Tasks:** board με drag & drop, προτεραιότητες, deadlines, ανάθεση, ορατότητα.
-- **Customers**, **Admins & Security**.
+- **Customers**, **Admins & Security**: αλλαγή του username και password σου, admin λογαριασμοί, οι συσκευές σου.
 - **Logs:** κάθε αλλαγή, πληρωμή, login και προβολή video.
 - **Reset data:** καθαρισμός logs, στατιστικών, παραγγελιών, ή **Reset User** με email.
 
@@ -54,9 +54,25 @@ cp .env.example .env     # συμπλήρωσε τα στοιχεία
 npm start                # http://localhost:3000
 ```
 
-**Γρήγορη δοκιμή χωρίς λογαριασμούς Google και PayPal:** βάλε `DEV_LOGIN=1` και `ADMIN_EMAILS=you@test.com` στο `.env`. Έτσι κάνεις login μόνο με email και εμφανίζεται κουμπί «Test payment». Τα emails αποθηκεύονται στο `data/outbox/`. **Ποτέ σε production.**
+**Γρήγορη δοκιμή χωρίς λογαριασμούς Google και PayPal:** βάλε `DEV_LOGIN=1` στο `.env`. Έτσι κάνεις login μόνο με email και εμφανίζεται κουμπί «Test payment». Τα emails αποθηκεύονται στο `data/outbox/`. **Ποτέ σε production.**
 
 Τα δεδομένα (βάση SQLite, uploads, private videos) μένουν στο φάκελο `data/`. Κράτα backup του.
+
+## Admin login
+
+Το Admin Panel **δεν** ανοίγει με email ή Google. Ανοίγει μόνο με ένα κρυφό **username** και **password**.
+
+1. Στην πρώτη εκκίνηση ο server γράφει στο παράθυρο έναν **setup code** (και στο `data/ADMIN-SETUP-CODE.txt`).
+2. Άνοιξε το `/admin`, βάλε τον κωδικό και διάλεξε username και password (τουλάχιστον 10 χαρακτήρες).
+3. Αλλαγή οποτεδήποτε: Admin → Admins & Security → «Your login» (ζητάει τον τωρινό κωδικό).
+
+Ασφάλεια:
+- Οι κωδικοί αποθηκεύονται μόνο ως scrypt hash.
+- Μετά από 5 λάθος προσπάθειες η σύνδεση κλειδώνει για 5 λεπτά, και ο χρόνος διπλασιάζεται κάθε φορά.
+- Κάθε προσπάθεια γράφεται στα Logs.
+- Το session είναι σε httpOnly/SameSite cookie. Όταν αλλάζεις κωδικό, αποσυνδέονται όλες οι άλλες συσκευές.
+
+Στο Render μπορείς να βάλεις `ADMIN_USERNAME` και `ADMIN_PASSWORD`. Χρησιμοποιούνται μόνο για τον πρώτο λογαριασμό.
 
 ## Ρυθμίσεις (.env)
 
@@ -98,7 +114,7 @@ data/     database, uploads, private videos, outbox (not in git)
 ## Online (Render)
 
 1. https://dashboard.render.com → **New → Blueprint** → διάλεξε το repo `giannis2009/Test`.
-2. Συμπλήρωσε `ADMIN_EMAILS`, `PUBLIC_URL`, `GOOGLE_CLIENT_ID` (και PayPal / SMTP όταν τα έχεις) → **Apply**.
+2. Συμπλήρωσε `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `PUBLIC_URL`, `GOOGLE_CLIENT_ID` (και PayPal / SMTP όταν τα έχεις) → **Apply**.
 3. Στο Google Cloud (OAuth client) πρόσθεσε το `PUBLIC_URL` στα *Authorized JavaScript origins*.
 
 Η βάση και τα uploads μένουν στον δίσκο `/var/data` (δεν χάνονται σε κάθε ενημέρωση).
