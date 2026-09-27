@@ -367,7 +367,7 @@
     tile.onclick = open;
     tile.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     tile.addEventListener('contextmenu', (e) => e.preventDefault());
-    tile.append(shareBtn(() => shareCover(m), 'on-card'), reactBar('media', m.id, { compact: true, dark: true }));
+    tile.append(shareBtn(() => shareCover(m), 'on-card'));
     natural(tile, m.url, m.type === 'video');
     return hasSong(m) ? songTile(tile, mediaSong(m)) : tile;
   }
@@ -396,8 +396,7 @@
       h('span', { class: 'album-sheen', 'aria-hidden': 'true' }),
       h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, h('strong', {}, a.title),
         a.artist ? h('span', { class: 'album-artist' }, a.artist) : null),
-      h('span', { class: 'album-go', html: icon('arrow-up-right') }),
-      reactBar('album', a.id, { compact: true, dark: true }));
+      h('span', { class: 'album-go', html: icon('arrow-up-right') }));
     card.addEventListener('click', (e) => {
       e.preventDefault();
       if (hasSong(a)) { playSong(albumSong(a), card); return; }
@@ -718,7 +717,7 @@
         { duration: 650 + Math.random() * 250, easing: 'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => p.remove();
     }
   }
-  // a heart and its number; compact on cards, a bit bigger on pages and in the full view
+  // a heart and its number — on product and album pages and in the full view of a cover
   function reactBar(type, id, { compact = false, dark = false } = {}) {
     const key = `${type}:${id}`;
     const btn = (cls, ic, value, label) => h('button', { type: 'button', class: `rx-btn ${cls}`, 'aria-label': label, title: label, onclick: (e) => { e.preventDefault(); e.stopPropagation(); react(key, value, e.currentTarget); } },
@@ -739,8 +738,7 @@
         off && !soon ? h('span', { class: 'chip' }, `−${off}%`) : null,
         p.soldOut ? h('span', { class: 'chip' }, 'Sold out') : null,
         p.stockLeft && !p.soldOut ? h('span', { class: 'chip' }, `Only ${p.stockLeft} left`) : null),
-      soon ? h('div', { class: 'soon-veil' }, h('strong', {}, 'Coming soon'), p.release_at && p.release_at > Date.now() ? countdown(p.release_at) : null) : null,
-      reactBar('product', p.id, { compact: true, dark: true }));
+      soon ? h('div', { class: 'soon-veil' }, h('strong', {}, 'Coming soon'), p.release_at && p.release_at > Date.now() ? countdown(p.release_at) : null) : null);
     const card = h('article', { class: `product ${soon ? 'soon' : ''}`, tabindex: '0' }, media,
       h('div', { class: 'p-body' },
         h('div', { class: 'p-title' }, p.title),

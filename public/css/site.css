@@ -579,9 +579,5 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .rx.dark .rx-like.on { color: #ff6b93; background: rgba(40, 8, 20, .6); border-color: rgba(255, 77, 125, .5); }
 .rx.compact .rx-btn { height: 30px; padding: 0 10px 0 9px; font-size: 12px; gap: 5px; }
 .rx.compact .rx-ic .i { width: 15px; height: 15px; }
-.album > .rx.compact, .p-media > .rx.compact { position: absolute; z-index: 6; right: 12px; bottom: 12px; }
-.album > .rx.compact { transition: opacity .3s var(--ease); }
-.album:hover > .rx.compact { opacity: 1; }
 .p-media { position: relative; }
 .lightbox .lb-rx { position: absolute; top: 18px; left: 18px; z-index: 2; }
-@media (max-width: 560px) { .album > .rx.compact { right: 7px; bottom: 7px; } .rx.compact .rx-btn { height: 26px; padding: 0 8px; font-size: 11px; } .album-meta { padding-right: 60px; } }
