@@ -281,23 +281,30 @@
     const albums = S.albums.filter(inCat);
     const items = S.media.filter((m) => inCat(m) && !m.album_id);
     const ab = $('#albums');
-    ab.replaceChildren(...albums.map((a, i) => E.reveal(albumCard(a), (i % 6) * 60)));
-    ab.classList.toggle('hidden', !albums.length);
+    // every cover — albums and single covers — shares one clean card grid
+    ab.replaceChildren(...albums.map((a, i) => E.reveal(albumCard(a), (i % 6) * 60)),
+      ...items.map((m, i) => E.reveal(coverTile(m, items, i), ((albums.length + i) % 6) * 60)));
+    ab.classList.toggle('hidden', !albums.length && !items.length);
     // with a category chosen, a section that has nothing in it is hidden instead of showing an empty box
     const hideWork = cat !== 'all' && !albums.length && !items.length && S.products.some((p) => String(p.category_id) === cat);
     $('#work').classList.toggle('hidden', hideWork);
-    if (!items.length) { g.replaceChildren(albums.length ? '' : h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.')); return; }
-    g.replaceChildren(...items.map((m, i) => {
-      const media = m.type === 'video' ? loopVideo(m) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
-      const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media,
-        m.title ? h('figcaption', { class: 'tile-cap' }, m.title) : null);
-      const open = () => (hasSong(m) ? playSong(mediaSong(m)) : lightbox(items, i));
-      tile.onclick = open;
-      tilt(tile);
-      tile.onkeydown = (e) => e.key === 'Enter' && open();
-      if (hasSong(m)) songTile(tile, mediaSong(m));
-      return E.reveal(tile, (i % 6) * 60);
-    }));
+    g.replaceChildren(albums.length || items.length ? '' : h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.'));
+  }
+  // A single cover (photo or video) in the same card style as an album: protected image, sheen, category + title at the bottom.
+  // With a song it plays and pops the song panel out next to it; without, it opens full screen.
+  function coverTile(m, list, i) {
+    const catName = S.site.categories.find((c) => c.id === m.category_id)?.name;
+    const title = m.song_title || m.title;
+    const media = m.type === 'video' ? h('div', { class: 'album-cover' }, loopVideo(m)) : protectedCover(m.url, 'album-cover');
+    const tile = h('div', { class: 'album cover-tile', tabindex: '0', role: 'button', 'aria-label': title || catName || 'Cover' }, media,
+      h('span', { class: 'album-sheen', 'aria-hidden': 'true' }),
+      h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, title ? h('strong', {}, title) : null,
+        m.artist ? h('span', { class: 'album-artist' }, m.artist) : null));
+    const open = () => (hasSong(m) ? playSong(mediaSong(m), tile) : lightbox(list, i));
+    tile.onclick = open;
+    tile.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+    tile.addEventListener('contextmenu', (e) => e.preventDefault());
+    return hasSong(m) ? songTile(tile, mediaSong(m)) : tile;
   }
   // Protected cover: painted as a CSS background under a transparent shield — no <img> to
   // right-click, drag or long-press-save.
@@ -327,7 +334,7 @@
       h('span', { class: 'album-go', html: icon('arrow-up-right') }));
     card.addEventListener('click', (e) => {
       e.preventDefault();
-      if (hasSong(a)) { playSong(albumSong(a)); return; }
+      if (hasSong(a)) { playSong(albumSong(a), card); return; }
       const c = card.querySelector('.album-cover'); if (c) c.style.viewTransitionName = 'product-hero';
       navigate(`/album/${a.id}`, { fromHome: location.pathname === '/' });
     });
@@ -346,7 +353,7 @@
   const albumSong = (a) => ({ key: `a${a.id}`, title: a.song_title || a.title, artist: a.artist, cover: a.cover_url || a.first_url, audio_url: a.audio_url, link_url: a.link_url,
     facts: [a.release_date, a.genre].filter(Boolean), credits: a.credits, album: a.count ? a.id : null });
   const mediaSong = (m) => ({ key: `m${m.id}`, title: m.song_title || m.title, artist: m.artist, cover: m.poster || (m.type === 'image' ? m.url : ''), audio_url: m.audio_url, link_url: m.link_url, facts: [], credits: m.caption });
-  const player = { panel: null, audio: null, key: null, mo: null };
+  const player = { panel: null, audio: null, key: null, mo: null, anchor: null, watch: null };
   const markPlaying = () => $$('[data-song]').forEach((el) => {
     const on = el.dataset.song === player.key;
     el.classList.toggle('is-current', on);
@@ -354,19 +361,47 @@
   });
   function closeSong() {
     const { panel, audio } = player;
-    audio?.pause(); player.mo?.disconnect();
-    Object.assign(player, { panel: null, audio: null, key: null, mo: null });
+    audio?.pause(); player.mo?.disconnect(); clearInterval(player.watch);
+    Object.assign(player, { panel: null, audio: null, key: null, mo: null, anchor: null, watch: null });
     markPlaying();
     if (panel) { panel.classList.add('out'); setTimeout(() => panel.remove(), 380); }
   }
-  function playSong(song) {
+  // The panel pops out next to the cover it belongs to (left side, arrow pointing at the cover);
+  // if there's no room on the left it opens on the right, then below. If the cover leaves the page, it docks bottom-left.
+  function placeSong() {
+    const { panel, anchor } = player;
+    if (!panel) return;
+    if (!anchor?.isConnected || !anchor.getClientRects().length) {
+      if (!panel.classList.contains('docked')) { panel.className = panel.className.replace(/\bside-\w+/g, ''); panel.classList.add('docked'); panel.style.left = ''; panel.style.top = ''; }
+      return;
+    }
+    const r = anchor.getBoundingClientRect(); const gap = 16; const pad = 12;
+    const pw = panel.offsetWidth; const ph = panel.offsetHeight; const vw = document.documentElement.clientWidth;
+    const side = r.left - gap - pw >= pad ? 'left' : vw - r.right - gap - pw >= pad ? 'right' : 'below';
+    let x; let y;
+    if (side === 'below') {
+      x = Math.min(Math.max(pad, r.left + r.width / 2 - pw / 2), vw - pw - pad);
+      y = r.top + Math.min(r.height * 0.62, r.height - 40);
+      panel.style.setProperty('--ax', `${Math.min(Math.max(24, r.left + r.width / 2 - x), pw - 24)}px`);
+    } else {
+      x = side === 'left' ? r.left - gap - pw : r.right + gap;
+      const cy = r.top + r.height / 2;
+      y = Math.min(Math.max(cy - ph / 2, Math.max(pad, r.top)), Math.max(Math.min(innerHeight - ph - pad, r.bottom - ph), r.top));
+      panel.style.setProperty('--ay', `${Math.min(Math.max(24, cy - y), ph - 24)}px`);
+    }
+    panel.classList.remove('docked', 'side-left', 'side-right', 'side-below');
+    panel.classList.add(`side-${side}`);
+    panel.style.left = `${x + scrollX}px`; panel.style.top = `${y + scrollY}px`;
+  }
+  addEventListener('resize', () => placeSong());
+  function playSong(song, anchor) {
     // the same cover again → play / pause
     if (player.key === song.key && player.panel) {
       if (player.audio) player.audio.paused ? player.audio.play().catch(() => {}) : player.audio.pause();
       return;
     }
     const old = player.panel;
-    player.audio?.pause(); player.mo?.disconnect();
+    player.audio?.pause(); player.mo?.disconnect(); clearInterval(player.watch);
     if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 380); }
     const kids = [];
     let audio = null;
@@ -399,7 +434,8 @@
     } else if (song.link_url) {
       kids.push(h('a', { class: 'btn sm', href: song.link_url, target: '_blank', rel: 'noopener noreferrer' }, iconEl(/youtu/i.test(song.link_url) ? 'youtube' : 'external'), 'Listen'));
     }
-    const panel = h('aside', { class: 'song-panel glass', role: 'region', 'aria-label': 'Now playing' },
+    const panel = h('aside', { class: 'song-panel', role: 'region', 'aria-label': 'Now playing' },
+      h('span', { class: 'spn-arrow', 'aria-hidden': 'true' }),
       h('button', { type: 'button', class: 'spn-close', 'aria-label': 'Close', html: icon('close'), onclick: closeSong }),
       h('div', { class: 'spn-top' },
         protectedCover(song.cover, 'spn-cover'),
@@ -409,9 +445,13 @@
       ...kids,
       song.credits ? h('p', { class: 'spn-credits' }, song.credits) : null,
       song.album ? h('button', { type: 'button', class: 'btn sm spn-open', onclick: () => navigate(`/album/${song.album}`) }, 'Open album', iconEl('chevron-right')) : null);
-    Object.assign(player, { panel, audio, key: song.key, mo });
+    Object.assign(player, { panel, audio, key: song.key, mo, anchor: anchor || null });
     document.body.append(panel);
-    requestAnimationFrame(() => panel.classList.add('in'));
+    placeSong();
+    // re-place when its content grows (Spotify loads) or the page changes under it
+    if ('ResizeObserver' in window) new ResizeObserver(() => placeSong()).observe(panel);
+    player.watch = setInterval(placeSong, 400);
+    requestAnimationFrame(() => { panel.classList.add('in'); if (!panel.classList.contains('docked')) setTimeout(() => panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 120); });
     audio?.play().catch(() => {});
     markPlaying();
   }
@@ -439,7 +479,7 @@
       h('header', { class: 'album-hero' },
         cover ? (() => {
           const c = protectedCover(cover, 'album-hero-cover'); c.style.viewTransitionName = 'product-hero'; c.oncontextmenu = (e) => e.preventDefault();
-          if (hasSong(a)) { c.tabIndex = 0; c.onclick = () => playSong({ ...albumSong(a), album: null }); c.onkeydown = (e) => e.key === 'Enter' && c.click(); songTile(c, albumSong(a)); }
+          if (hasSong(a)) { c.tabIndex = 0; c.onclick = () => playSong({ ...albumSong(a), album: null }, c); c.onkeydown = (e) => e.key === 'Enter' && c.click(); songTile(c, albumSong(a)); }
           return c;
         })() : null,
         h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
@@ -447,16 +487,7 @@
           [a.release_date, a.genre].some(Boolean) ? h('div', { class: 'album-facts' }, [a.release_date, a.genre].filter(Boolean).map((t) => h('span', { class: 'chip' }, t))) : null,
           a.description ? h('p', {}, a.description) : null,
           a.credits ? h('p', { class: 'album-credits' }, a.credits) : null)),
-      photos.length ? h('div', { class: 'gallery album-grid' }, photos.map((m, i) => {
-        const media = m.type === 'video' ? loopVideo(m) : h('img', { src: m.url, alt: m.title || '', loading: 'lazy' });
-        const tile = h('figure', { class: 'tile', style: { margin: '0 0 14px' }, tabindex: '0' }, media);
-        const open = () => (hasSong(m) ? playSong(mediaSong(m)) : lightbox(photos, i));
-        tile.onclick = open;
-        tile.onkeydown = (e) => e.key === 'Enter' && open();
-        if (hasSong(m)) songTile(tile, mediaSong(m));
-        tilt(tile);
-        return E.reveal(tile, (i % 6) * 50);
-      })) : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
+      photos.length ? h('div', { class: 'albums album-grid' }, photos.map((m, i) => E.reveal(coverTile(m, photos, i), (i % 6) * 50))) : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
       others.length ? h('div', { class: 'pp-more' }, h('h2', {}, 'More albums'), h('div', { class: 'albums' }, others.map(albumCard))) : null));
     pageCleanup = null;
     E.applyTexts(view, 'home');
