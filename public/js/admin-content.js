@@ -135,9 +135,11 @@
     const name = input(c.name, { placeholder: 'e.g. MOTION', autofocus: true });
     const desc = input(c.description, { placeholder: 'Optional' });
     const visible = toggle(!!c.visible, 'Visible on the site');
+    let shape = c.shape || 'square';
+    const shapeSeg = segmented([['square', 'Square covers'], ['original', 'Original size']], shape, (v) => { shape = v; }, { block: true });
     const save = h('button', { class: 'btn primary' }, 'Save');
     save.onclick = () => withBusy(save, async () => {
-      try { await api(isNew ? '/api/admin/categories' : `/api/admin/categories/${c.id}`, { method: isNew ? 'POST' : 'PUT', body: { name: name.value, description: desc.value, icon: ic, visible: visible.checked } }); toast('Saved', 'success'); s.close(); A.refresh(); } catch (e) { fail(e); }
+      try { await api(isNew ? '/api/admin/categories' : `/api/admin/categories/${c.id}`, { method: isNew ? 'POST' : 'PUT', body: { name: name.value, description: desc.value, icon: ic, visible: visible.checked, shape } }); toast('Saved', 'success'); s.close(); A.refresh(); } catch (e) { fail(e); }
     });
     const foot = [];
     if (!isNew) foot.push(A.btn('Remove', 'trash', async () => {
@@ -145,7 +147,7 @@
       await api(`/api/admin/categories/${c.id}`, { method: 'DELETE' }).catch(fail); s.close(); A.refresh();
     }, 'danger'));
     foot.push(h('div', { class: 'spacer' }), visible, save);
-    const s = sheet({ title: isNew ? 'Add category' : `Edit ${c.name}`, foot, body: h('div', { class: 'form' }, field('Name', name), field('Description', desc), field('Icon', A.iconPicker(ic, (n) => { ic = n; }, { brands: false }))) });
+    const s = sheet({ title: isNew ? 'Add category' : `Edit ${c.name}`, foot, body: h('div', { class: 'form' }, field('Name', name), field('Description', desc), field('How covers are shown', shapeSeg, 'Original size keeps every image and video in its own proportions — best for 3D work.'), field('Icon', A.iconPicker(ic, (n) => { ic = n; }, { brands: false }))) });
   }
   function editMedia(m, categories, reload) {
     const isNew = !m.id;

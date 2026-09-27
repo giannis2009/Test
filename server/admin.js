@@ -138,8 +138,9 @@ router.post('/categories', (req, res) => {
   let slug = slugify(req.body?.slug || name);
   if (get('SELECT 1 FROM categories WHERE slug = ?', slug)) slug = `${slug}-${Date.now() % 10000}`;
   const sort = get('SELECT COALESCE(MAX(sort), -1) + 1 s FROM categories').s;
-  const r = run('INSERT INTO categories (name, slug, icon, description, sort, visible, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    name, slug, str(req.body?.icon, 300) || 'sparkles', str(req.body?.description, 500), sort, req.body?.visible === false ? 0 : 1, now());
+  const r = run('INSERT INTO categories (name, slug, icon, description, sort, visible, created_at, shape) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    name, slug, str(req.body?.icon, 300) || 'sparkles', str(req.body?.description, 500), sort, req.body?.visible === false ? 0 : 1, now(),
+    req.body?.shape === 'original' ? 'original' : 'square');
   log(req, 'category.add', name);
   res.json({ id: Number(r.lastInsertRowid) });
 });
@@ -147,6 +148,7 @@ router.put('/categories/:id', (req, res) => {
   const c = get('SELECT * FROM categories WHERE id = ?', int(req.params.id));
   if (!c) throw new HttpError(404, 'Not found');
   const b = req.body || {};
+  if (b.shape !== undefined) run('UPDATE categories SET shape = ? WHERE id = ?', b.shape === 'original' ? 'original' : 'square', c.id);
   run('UPDATE categories SET name = ?, slug = ?, icon = ?, description = ?, visible = ? WHERE id = ?',
     str(b.name ?? c.name, 60) || c.name, b.slug ? slugify(b.slug) : c.slug, str(b.icon ?? c.icon, 300), str(b.description ?? c.description, 500),
     b.visible === undefined ? c.visible : bool(b.visible) ? 1 : 0, c.id);

@@ -35,7 +35,7 @@ router.get('/site', (_req, res) => {
     },
     paymentMethods: all('SELECT id, name, icon, description FROM payment_methods WHERE enabled = 1 ORDER BY sort, id'),
     socials: all('SELECT id, name, icon, url FROM socials WHERE visible = 1 ORDER BY sort, id'),
-    categories: all('SELECT id, name, slug, icon, description FROM categories WHERE visible = 1 ORDER BY sort, id'),
+    categories: all('SELECT id, name, slug, icon, description, shape FROM categories WHERE visible = 1 ORDER BY sort, id'),
     texts: all('SELECT page, original, replacement, deleted FROM texts'),
   });
 });

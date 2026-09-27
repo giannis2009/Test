@@ -189,6 +189,12 @@ if (!all('PRAGMA table_info(media)').some((c) => c.name === 'album_id')) {
   for (const c of ['song_title', 'artist', 'audio_url', 'link_url']) if (!cols.includes(c)) db.exec(`ALTER TABLE media ADD COLUMN ${c} TEXT DEFAULT ''`);
 }
 
+// How a category shows its covers: square cards, or every file in its original size (3D work, videos).
+if (!all('PRAGMA table_info(categories)').some((c) => c.name === 'shape')) {
+  db.exec("ALTER TABLE categories ADD COLUMN shape TEXT DEFAULT 'square'");
+  db.exec("UPDATE categories SET shape = 'original' WHERE UPPER(name) LIKE '%3D%'");
+}
+
 // Profile edits (name / photo) that Google sign-in must not overwrite.
 {
   const cols = all('PRAGMA table_info(users)').map((c) => c.name);

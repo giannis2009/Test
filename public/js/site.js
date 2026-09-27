@@ -285,6 +285,7 @@
     ab.replaceChildren(...albums.map((a, i) => E.reveal(albumCard(a), (i % 6) * 60)),
       ...items.map((m, i) => E.reveal(coverTile(m, items, i), ((albums.length + i) % 6) * 60)));
     ab.classList.toggle('hidden', !albums.length && !items.length);
+    ab.classList.toggle('masonry', cat !== 'all' && catShape(cat) === 'original');
     // with a category chosen, a section that has nothing in it is hidden instead of showing an empty box
     const hideWork = cat !== 'all' && !albums.length && !items.length && S.products.some((p) => String(p.category_id) === cat);
     $('#work').classList.toggle('hidden', hideWork);
@@ -292,9 +293,19 @@
   }
   // A single cover (photo or video) in the same card style as an album: protected image, sheen, category + title at the bottom.
   // With a song it plays and pops the song panel out next to it; without, it opens full screen.
+  const catShape = (id) => S.site.categories.find((c) => String(c.id) === String(id))?.shape || 'square';
+  // an upload's file name (e.g. "f105a99f c2b5 46c0…" or "IMG_2231.png") is not a real title
+  const realTitle = (t) => (t && !/^[0-9a-f]{6,}([\s_-]+[0-9a-f]{3,}){2,}$/i.test(t.trim()) && !/\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i.test(t.trim()) ? t : '');
+  // "original size" categories: the card takes the real proportions of its image / video
+  function natural(tile, url, isVideo) {
+    if (!url) return;
+    const set = (w, hgt) => { if (w && hgt) tile.style.setProperty('--ar', `${w} / ${hgt}`); };
+    if (isVideo) { const v = tile.querySelector('video'); v?.addEventListener('loadedmetadata', () => set(v.videoWidth, v.videoHeight), { once: true }); if (v?.videoWidth) set(v.videoWidth, v.videoHeight); return; }
+    const im = new Image(); im.onload = () => set(im.naturalWidth, im.naturalHeight); im.src = url;
+  }
   function coverTile(m, list, i) {
     const catName = S.site.categories.find((c) => c.id === m.category_id)?.name;
-    const title = m.song_title || m.title;
+    const title = m.song_title || realTitle(m.title);
     const media = m.type === 'video' ? h('div', { class: 'album-cover' }, loopVideo(m)) : protectedCover(m.url, 'album-cover');
     const tile = h('div', { class: 'album cover-tile', tabindex: '0', role: 'button', 'aria-label': title || catName || 'Cover' }, media,
       h('span', { class: 'album-sheen', 'aria-hidden': 'true' }),
@@ -304,6 +315,7 @@
     tile.onclick = open;
     tile.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     tile.addEventListener('contextmenu', (e) => e.preventDefault());
+    natural(tile, m.url, m.type === 'video');
     return hasSong(m) ? songTile(tile, mediaSong(m)) : tile;
   }
   // Protected cover: painted as a CSS background under a transparent shield — no <img> to
@@ -340,6 +352,7 @@
     });
     card.addEventListener('contextmenu', (e) => e.preventDefault());
     card.addEventListener('dragstart', (e) => e.preventDefault());
+    natural(card, cover, false);
     return hasSong(a) ? songTile(card, albumSong(a)) : card;
   }
 
@@ -496,7 +509,7 @@
           [a.release_date, a.genre].some(Boolean) ? h('div', { class: 'album-facts' }, [a.release_date, a.genre].filter(Boolean).map((t) => h('span', { class: 'chip' }, t))) : null,
           a.description ? h('p', {}, a.description) : null,
           a.credits ? h('p', { class: 'album-credits' }, a.credits) : null)),
-      photos.length ? h('div', { class: 'albums album-grid' }, photos.map((m, i) => E.reveal(coverTile(m, photos, i), (i % 6) * 50))) : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
+      photos.length ? h('div', { class: `albums album-grid ${catShape(a.category_id) === 'original' ? 'masonry' : ''}` }, photos.map((m, i) => E.reveal(coverTile(m, photos, i), (i % 6) * 50))) : h('div', { class: 'empty' }, iconEl('image'), 'Photos are coming soon.'),
       others.length ? h('div', { class: 'pp-more' }, h('h2', {}, 'More albums'), h('div', { class: 'albums' }, others.map(albumCard))) : null));
     pageCleanup = null;
     E.applyTexts(view, 'home');
