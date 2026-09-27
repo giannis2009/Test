@@ -266,7 +266,9 @@
     $('#workLabel').textContent = c ? c.name : '';
     $('#shopLabel').textContent = c ? c.name : '';
     if (scroll) {
-      const hasWork = S.media.some((m) => cat === 'all' || String(m.category_id) === cat);
+      // decide the target now (content swaps in a moment later): the first section that has something for this category
+      const hasWork = cat === 'all' || S.albums.some((a) => String(a.category_id) === cat) || S.media.some((m) => !m.album_id && String(m.category_id) === cat)
+        || !S.products.some((p) => String(p.category_id) === cat);
       const target = hasWork ? $('#work') : $('#shop');
       setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), location.pathname === '/' ? 0 : 60);
     }
@@ -282,6 +284,9 @@
     const ab = $('#albums');
     ab.replaceChildren(...albums.map((a, i) => E.reveal(albumCard(a), (i % 6) * 60)));
     ab.classList.toggle('hidden', !albums.length);
+    // with a category chosen, a section that has nothing in it is hidden instead of showing an empty box
+    const hideWork = cat !== 'all' && !albums.length && !items.length && S.products.some((p) => String(p.category_id) === cat);
+    $('#work').classList.toggle('hidden', hideWork);
     if (!items.length) { g.replaceChildren(albums.length ? '' : h('div', { class: 'empty' }, iconEl('image'), 'New work is coming soon.')); return; }
     g.replaceChildren(...items.map((m, i) => {
       const media = m.type === 'video'
@@ -430,6 +435,7 @@
     soonTimers.splice(0).forEach(clearInterval);
     const grid = $('#products');
     const list = S.products.filter((p) => cat === 'all' || String(p.category_id) === cat);
+    $('#shop').classList.toggle('hidden', cat !== 'all' && !list.length);
     if (!list.length) { grid.replaceChildren(h('div', { class: 'empty', style: { gridColumn: '1/-1' } }, iconEl('bag'), 'Products are on the way.')); return; }
     grid.replaceChildren(...list.map((p, i) => E.reveal(productCard(p), (i % 4) * 70)));
   }
