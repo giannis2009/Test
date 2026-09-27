@@ -346,3 +346,7 @@ table.t tbody tr.click:hover { background: var(--hover); }
 .lk-n { flex: none; min-width: 58px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-2); }
 .lk-n.like { color: var(--text); }
 @media (max-width: 700px) { .lk-bar { display: none; } .lk-n { min-width: 44px; } }
+.pp-url { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+.pp-url > div:first-child { display: grid; gap: 3px; font-size: 13px; }
+.pp-url > div:first-child span { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.pp-url code { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); font-size: 12.5px; overflow-wrap: anywhere; }

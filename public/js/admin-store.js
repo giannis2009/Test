@@ -263,7 +263,7 @@
 
   /* ================= Payments & Checkout ================= */
   A.pages.payments = async () => {
-    const [{ methods, paypal }, c] = await Promise.all([api('/api/admin/payment-methods'), api('/api/admin/settings/checkout')]);
+    const [{ methods, paypal }, c, notes] = await Promise.all([api('/api/admin/payment-methods'), api('/api/admin/settings/checkout'), api('/api/admin/paypal/notifications').catch(() => ({ events: [] }))]);
     const pp = { enabled: toggle(c.paypalEnabled, 'Show PayPal at checkout'), label: input(c.paypalLabel), desc: input(c.paypalDescription) };
     const co = {
       currency: select(['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'AUD', 'PLN', 'SEK', 'NOK', 'DKK', 'CZK', 'HUF', 'JPY'].map((x) => [x, x]), c.currency),
@@ -283,12 +283,31 @@
       h('button', { class: 'btn icon sm ghost', 'aria-label': 'Edit', html: icon('edit'), onclick: () => editMethod(m) }))));
     E.dragSort({ containers: [list], item: '.lrow', handle: '.handle', onDrop: () => A.reorder('payment_methods', $$('.lrow', list).map((r) => Number(r.dataset.id))) });
 
+    // PayPal notifications: the two addresses to paste into PayPal + the latest messages received
+    const base = location.origin;
+    const urlRow = (label, path, hint) => h('div', { class: 'pp-url' }, h('div', {}, h('strong', {}, label), h('span', {}, hint)),
+      h('div', { class: 'input-group' }, h('code', { class: 'mono' }, `${base}${path}`), h('button', { type: 'button', class: 'btn icon sm ghost', 'aria-label': `Copy ${label}`, html: icon('copy'), onclick: () => E.copy(`${base}${path}`) })));
+    const evRows = notes.events?.length ? h('div', { class: 'list' }, notes.events.slice(0, 12).map((e) => h('div', { class: 'lrow' },
+      h('div', { class: 'ic', html: icon(e.source === 'ipn' ? 'mail' : 'bolt') }),
+      h('div', { class: 'tt' }, h('strong', {}, e.type || '—', e.number ? h('span', { class: 'chip', style: { marginLeft: '8px', display: 'inline-flex', verticalAlign: 'middle' } }, e.number) : null),
+        h('span', {}, `${e.source === 'ipn' ? 'IPN' : 'Webhook'} · ${e.result} · ${E.timeAgo(e.received_at)}`)))))
+      : h('div', { class: 'empty', style: { padding: '18px' } }, 'No notifications received yet.');
+    const notifyPanel = A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, 'PayPal notifications',
+      h('span', { class: `chip ${notes.webhookId ? 'good' : 'warn'}` }, notes.webhookId ? 'Webhook ready' : 'PAYPAL_WEBHOOK_ID missing')),
+      h('p', { class: 'desc' }, 'PayPal tells the site directly when a payment completes, is refunded or reversed — even if the buyer closed the page. Codes are delivered or revoked automatically, and every message is verified with PayPal first.'),
+      h('div', { class: 'form' },
+        urlRow('Webhook URL', '/api/paypal/webhook', 'developer.paypal.com → your app → Webhooks → Add webhook → “All events”. Then put the Webhook ID in .env as PAYPAL_WEBHOOK_ID.'),
+        urlRow('IPN URL (optional)', '/api/paypal/ipn', 'paypal.com → Settings → Website payments → Instant payment notifications → Notification URL.'),
+        /localhost|127\.0\.0\.1/.test(base) ? h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--warn)' } }, 'PayPal cannot reach localhost — these work once the site is online (Render / your domain).') : null),
+      h('div', { class: 'panel-title', style: { margin: '18px 0 8px' } }, h('span', { class: 'dot' }), 'Latest notifications'), evRows);
+
     return [A.head('Payments & Checkout', 'PayPal, your own payment methods, and everything the checkout shows.'),
       h('div', { class: 'page' }, h('div', { class: 'split' },
         h('div', { style: { display: 'grid', gap: '18px' } },
           A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, 'PayPal', h('span', { class: `chip ${paypal.configured ? 'good' : 'warn'}` }, paypal.configured ? `Connected · ${paypal.env}` : 'Keys missing in .env')),
             h('p', { class: 'desc' }, 'Payments are captured and verified on the server — the key is only sent after PayPal confirms the exact amount arrived.'),
             h('div', { class: 'form' }, pp.enabled, h('div', { class: 'row' }, field('Label', pp.label), field('Description', pp.desc)), h('div', { class: 'form-actions' }, savePP))),
+          notifyPanel,
           A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 } }, 'Your payment methods', h('span', { style: { marginLeft: 'auto' } }, A.btn('Add method', 'plus', () => editMethod(null), 'sm'))),
             h('p', { class: 'desc' }, 'Bank transfer, IRIS, Revolut, crypto… The customer sees your instructions, the order waits as “Pending” and you confirm it in Orders — then the redeem code appears in their profile.'),
             methods.length ? list : h('div', { class: 'empty' }, 'No custom methods yet'))),

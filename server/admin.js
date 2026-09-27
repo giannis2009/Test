@@ -16,6 +16,7 @@ router.use(requireAdmin);
 router.use(accounts);
 router.use(require('./backup').router);
 router.use(require('./reactions').admin);
+router.use(require('./paypal-notify').admin);
 
 const J = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const day = (t) => new Date(t).toISOString().slice(0, 10);

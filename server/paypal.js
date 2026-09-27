@@ -65,4 +65,4 @@ function createOrder(order, brandName, source = 'paypal') {
 const captureOrder = (paypalOrderId) => call(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, 'POST', {}, `capture-${paypalOrderId}`);
 const getOrder = (paypalOrderId) => call(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`);
 
-module.exports = { configured, createOrder, captureOrder, getOrder, CLIENT_ID, fmt };
+module.exports = { configured, createOrder, captureOrder, getOrder, call, CLIENT_ID, fmt };

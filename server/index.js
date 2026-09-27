@@ -51,7 +51,8 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
-app.use(express.json({ limit: '1mb' }));
+// the PayPal webhook signature is checked against the exact bytes PayPal sent
+app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/paypal/')) req.rawBody = buf.toString('utf8'); } }));
 app.use(auth.sessionMiddleware);
 app.use(adminAuth.adminSession);
 
@@ -70,6 +71,7 @@ app.use('/api/public', publicApi.router);
 app.use('/api/public', require('./reactions').router);
 app.use('/api/shop', shop.router);
 app.use('/api/watch', watch.router);
+app.use('/api/paypal', require('./paypal-notify').router);
 app.use('/api/admin', admin.router);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

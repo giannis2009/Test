@@ -94,6 +94,18 @@ npm start                # http://localhost:3000
 - Κάθε cover έχει δικό του link (`/cover/12`). Όταν το link μπαίνει σε Instagram, Discord, Viber, WhatsApp ή Messenger, φαίνεται με μεγάλη εικόνα, τίτλο και καλλιτέχνη.
 - Η προεπισκόπηση δουλεύει μόνο όταν το site είναι online. Από το `localhost` οι εφαρμογές δεν μπορούν να το δουν.
 
+## PayPal Webhooks & IPN
+
+Το PayPal ειδοποιεί μόνο του το site για κάθε ολοκλήρωση, επιστροφή χρημάτων ή αντιστροφή πληρωμής, ακόμα κι αν ο πελάτης έκλεισε τη σελίδα.
+- **Webhook** (προτείνεται): `https://το-site-σου/api/paypal/webhook`.
+  1. Στο developer.paypal.com → η εφαρμογή σου → Webhooks → Add webhook → «All events».
+  2. Βάλε το **Webhook ID** στο `.env` ως `PAYPAL_WEBHOOK_ID`.
+- **IPN** (προαιρετικό): `https://το-site-σου/api/paypal/ipn`.
+  - Στο paypal.com → Settings → Website payments → Instant payment notifications.
+- Κάθε μήνυμα **επιβεβαιώνεται με το PayPal** πριν αλλάξει οτιδήποτε. Εφαρμόζεται μία φορά και ελέγχεται το ακριβές ποσό.
+- Τα τελευταία μηνύματα φαίνονται στο Admin → Payments & Checkout.
+- Δουλεύει μόνο όταν το site είναι online. Το PayPal δεν μπορεί να φτάσει το `localhost`.
+
 ## Ρυθμίσεις (.env)
 
 - **Google login:** `GOOGLE_CLIENT_ID`. Φτιάξε OAuth Client ID τύπου *Web* και πρόσθεσε το domain σου στα *Authorized JavaScript origins*.
