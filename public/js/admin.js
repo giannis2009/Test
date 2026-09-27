@@ -66,7 +66,7 @@
   function shell() {
     side = h('aside', { class: 'side' },
       h('a', { class: 'side-brand', href: '/', title: 'Open site' }, h('img', { src: Admin.site?.appearance?.logoUrl || '/assets/logo.webp', alt: 'Ezro' }), h('small', {}, 'Admin')),
-      NAV.map(([group, items]) => [h('div', { class: 'side-group' }, group), items.map(([id, label, ic]) => h('a', { class: 'nav-i', href: `#/${id}`, dataset: { id } }, iconEl(ic), h('span', {}, label)))]),
+      h('nav', { class: 'side-nav' }, NAV.map(([group, items]) => h('div', { class: 'side-sec' }, h('div', { class: 'side-group' }, group), items.map(([id, label, ic]) => h('a', { class: 'nav-i', href: `#/${id}`, dataset: { id }, title: label }, iconEl(ic), h('span', {}, label)))))),
       h('div', { class: 'side-foot' }, E.avatarEl(Admin.me, 34), h('div', { class: 'who' }, h('strong', {}, Admin.me.username), h('span', {}, Admin.me.role === 'owner' ? 'Owner' : 'Admin')),
         E.themeButton(), h('button', { class: 'btn icon ghost', 'aria-label': 'Sign out', title: 'Sign out', html: icon('logout'), onclick: signOut })));
     main = h('main', { class: 'main' });
