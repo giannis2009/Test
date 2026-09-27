@@ -30,7 +30,7 @@ router.get('/site', (_req, res) => {
       requireTerms: checkout.requireTerms, termsText: checkout.termsText, successTitle: checkout.successTitle,
       successMessage: checkout.successMessage, buttonText: checkout.buttonText,
       paypal: checkout.paypalEnabled && paypal.configured()
-        ? { clientId: paypal.CLIENT_ID, label: checkout.paypalLabel, description: checkout.paypalDescription } : null,
+        ? { label: checkout.paypalLabel, description: checkout.paypalDescription, sandbox: paypal.sandbox() } : null,
       devPay: DEV_PAY,
     },
     paymentMethods: all('SELECT id, name, icon, description FROM payment_methods WHERE enabled = 1 ORDER BY sort, id'),

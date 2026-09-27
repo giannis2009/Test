@@ -143,7 +143,7 @@ const DEFAULTS = {
     currency: 'EUR', taxPercent: 0, taxLabel: 'VAT', taxIncluded: true, requireTerms: true,
     termsText: 'I agree that this is a digital product and access is delivered instantly.',
     successTitle: 'Payment complete', successMessage: 'Your redeem code is saved in your profile.',
-    paypalEnabled: true, paypalLabel: 'PayPal', paypalDescription: 'Pay securely with PayPal or card.',
+    paypalEnabled: true, paypalLabel: 'PayPal', paypalDescription: 'Pay with your PayPal balance, bank or card.', paypalEmail: '', paypalSandbox: false,
     buttonText: 'Checkout',
   },
   invoice: {

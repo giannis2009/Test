@@ -94,24 +94,19 @@ npm start                # http://localhost:3000
 - Κάθε cover έχει δικό του link (`/cover/12`). Όταν το link μπαίνει σε Instagram, Discord, Viber, WhatsApp ή Messenger, φαίνεται με μεγάλη εικόνα, τίτλο και καλλιτέχνη.
 - Η προεπισκόπηση δουλεύει μόνο όταν το site είναι online. Από το `localhost` οι εφαρμογές δεν μπορούν να το δουν.
 
-## PayPal Webhooks & IPN
+## PayPal (IPN)
 
-Το PayPal ειδοποιεί μόνο του το site για κάθε ολοκλήρωση, επιστροφή χρημάτων ή αντιστροφή πληρωμής, ακόμα κι αν ο πελάτης έκλεισε τη σελίδα.
-- **Webhook** (προτείνεται): `https://το-site-σου/api/paypal/webhook`.
-  1. Στο developer.paypal.com → η εφαρμογή σου → Webhooks → Add webhook → «All events».
-  2. Βάλε το **Webhook ID** στο `.env` ως `PAYPAL_WEBHOOK_ID`.
-- **IPN** (προαιρετικό): `https://το-site-σου/api/paypal/ipn`.
-  - Στο paypal.com → Settings → Website payments → Instant payment notifications.
-- Κάθε μήνυμα **επιβεβαιώνεται με το PayPal** πριν αλλάξει οτιδήποτε. Εφαρμόζεται μία φορά και ελέγχεται το ακριβές ποσό.
-- Τα τελευταία μηνύματα φαίνονται στο Admin → Payments & Checkout.
-- Δουλεύει μόνο όταν το site είναι online. Το PayPal δεν μπορεί να φτάσει το `localhost`.
+- Ο πελάτης πατάει «Pay with PayPal» και πληρώνει στη **σελίδα του PayPal**, από Balance, τράπεζα ή κάρτα.
+- Το PayPal ειδοποιεί το site με **IPN** στο `https://το-site-σου/api/paypal/ipn`. Κάθε μήνυμα **επιβεβαιώνεται με το PayPal**, ελέγχεται το email που εισπράττει και το ακριβές ποσό, και μετά δίνεται ο κωδικός.
+- Επιστροφή χρημάτων ή αντιστροφή πληρωμής → ο κωδικός ακυρώνεται αυτόματα.
+- **Ρύθμιση:** Admin → Payments & Checkout → «Your PayPal email». Χωρίς API keys. Το «Sandbox» είναι για δοκιμές.
+- Για πληρωμή με κάρτα χωρίς λογαριασμό PayPal: στο PayPal → Website preferences → «PayPal account optional» → On.
+- Δουλεύει όταν το site είναι online. Το PayPal δεν μπορεί να φτάσει το `localhost`.
 
 ## Ρυθμίσεις (.env)
 
 - **Google login:** `GOOGLE_CLIENT_ID`. Φτιάξε OAuth Client ID τύπου *Web* και πρόσθεσε το domain σου στα *Authorized JavaScript origins*.
-- **PayPal:**
-  - `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`.
-  - `PAYPAL_ENV=sandbox` για δοκιμές, `live` για πραγματικά χρήματα.
+- **PayPal:** δεν χρειάζεται τίποτα στο `.env`. Βάζεις το PayPal email σου στο Admin → Payments & Checkout.
 - **Email:** `SMTP_*` και `MAIL_FROM`. Χωρίς αυτά τα emails αποθηκεύονται στο `data/outbox/`.
 - **Google Drive:**
   1. Βάλε στο `GOOGLE_SERVICE_ACCOUNT_JSON` το JSON του service account.

@@ -469,9 +469,20 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .pp-box-head span { font-size: 12.5px; color: var(--muted); }
 .pp-amount { margin-left: auto; text-align: right; }
 .pp-amount strong { font-size: 20px; letter-spacing: -.02em; }
-.pp-box .paypal-slot { margin: 0; padding: 18px 18px 6px; min-height: 120px; background: transparent; }
+.pp-box .paypal-slot { margin: 0; padding: 18px 18px 8px; display: grid; gap: 10px; background: transparent; }
+.pp-go { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 52px; border: 0; border-radius: 999px; cursor: pointer;
+  background: #ffc439; color: #111; font: 800 16px var(--font, inherit); letter-spacing: -.01em; box-shadow: 0 12px 30px -14px rgba(255, 196, 57, .7);
+  transition: transform .3s var(--spring), filter .2s, box-shadow .3s; }
+.pp-go:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); box-shadow: 0 16px 36px -14px rgba(255, 196, 57, .85); }
+.pp-go:active:not(:disabled) { transform: scale(.98); }
+.pp-go .pp-go-ic { display: grid; } .pp-go .pp-go-ic .i { width: 22px; height: 22px; color: #003087; }
+.pp-go > .i { width: 18px; height: 18px; transition: transform .3s var(--spring); }
+.pp-go:hover:not(:disabled) > .i { transform: translateX(3px); }
+.pp-go.loading { cursor: progress; }
+.pp-go.loading > .i { animation: spin .8s linear infinite; }
+.pp-note { margin: 0; font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.5; }
 /* Chrome paints an opaque white canvas behind a cross-origin iframe when the page is dark and the frame is light — matching the scheme keeps it transparent */
-.paypal-slot, .paypal-slot iframe, .sp-embed { color-scheme: light; background: transparent !important; }
+.sp-embed { color-scheme: light; background: transparent !important; }
 .pp-skel { display: grid; gap: 12px; }
 .pp-skel span { height: 48px; border-radius: 999px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
 .pp-box-foot { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px 16px; font-size: 12px; color: var(--muted); }

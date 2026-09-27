@@ -33,15 +33,15 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       'default-src': ["'self'"],
-      'script-src': ["'self'", 'https://accounts.google.com/gsi/client', 'https://www.paypal.com', 'https://*.paypal.com', 'https://*.paypalobjects.com'],
+      'script-src': ["'self'", 'https://accounts.google.com/gsi/client'],
       'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://accounts.google.com/gsi/style'],
       'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
       'img-src': ["'self'", 'data:', 'blob:', 'https:'],
       'media-src': ["'self'", 'blob:', 'https:'],
-      'connect-src': ["'self'", 'https://accounts.google.com', 'https://*.paypal.com', 'https://*.paypalobjects.com'],
-      'frame-src': ["'self'", 'https://open.spotify.com', 'https://accounts.google.com', 'https://*.paypal.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
+      'connect-src': ["'self'", 'https://accounts.google.com'],
+      'frame-src': ["'self'", 'https://open.spotify.com', 'https://accounts.google.com', 'https://www.youtube-nocookie.com', 'https://www.youtube.com', 'https://player.vimeo.com'],
       'frame-ancestors': ["'self'"],
-      'form-action': ["'self'"],
+      'form-action': ["'self'", 'https://www.paypal.com', 'https://www.sandbox.paypal.com'], // checkout posts to PayPal's payment page
       'upgrade-insecure-requests': process.env.NODE_ENV === 'production' ? [] : null,
     },
   },
@@ -51,8 +51,7 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
-// the PayPal webhook signature is checked against the exact bytes PayPal sent
-app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/paypal/')) req.rawBody = buf.toString('utf8'); } }));
+app.use(express.json({ limit: '1mb' }));
 app.use(auth.sessionMiddleware);
 app.use(adminAuth.adminSession);
 
@@ -71,7 +70,7 @@ app.use('/api/public', publicApi.router);
 app.use('/api/public', require('./reactions').router);
 app.use('/api/shop', shop.router);
 app.use('/api/watch', watch.router);
-app.use('/api/paypal', require('./paypal-notify').router);
+app.use('/api/paypal', require('./paypal').router); // IPN listener
 app.use('/api/admin', admin.router);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

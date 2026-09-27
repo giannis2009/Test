@@ -155,17 +155,9 @@ router.post('/checkout', requireUser, rateLimit({ max: 15 }), wrap(async (req, r
   if (method === 'paypal') {
     if (!checkout.paypalEnabled || !paypal.configured()) throw new HttpError(400, 'PayPal is not available right now.');
     const order = createOrder(req.user, q, 'paypal', checkout.paypalLabel || 'PayPal');
-    try {
-      const source = ['paypal', 'card', 'paylater', 'venmo'].includes(req.body?.paypalSource) ? req.body.paypalSource : 'paypal';
-      const pp = await paypal.createOrder(order, getSetting('site').name, source === 'card' ? 'card' : 'paypal');
-      run('UPDATE orders SET paypal_order_id = ? WHERE id = ?', pp.id, order.id);
-      log(req, 'order.created', order.number, { method: 'paypal', total: order.total_cents / 100 });
-      return res.json({ order: publicOrder(order), paypalOrderId: pp.id });
-    } catch (e) {
-      run("UPDATE orders SET status = 'failed' WHERE id = ?", order.id);
-      log(req, 'paypal.error', order.number, e.message);
-      throw new HttpError(502, 'PayPal could not start the payment. Please try again.');
-    }
+    log(req, 'order.created', order.number, { method: 'paypal', total: order.total_cents / 100 });
+    // the buyer goes to PayPal's own page; the IPN confirms the payment and delivers the codes
+    return res.json({ order: publicOrder(order), paypal: paypal.paymentForm(order, req) });
   }
 
   if (method === 'dev' && DEV_PAY) {
@@ -181,34 +173,6 @@ router.post('/checkout', requireUser, rateLimit({ max: 15 }), wrap(async (req, r
   log(req, 'order.created', order.number, { method: pm.name, total: order.total_cents / 100 });
   const instructions = pm.instructions.replaceAll('{number}', order.number);
   res.json({ order: publicOrder(order), instructions });
-}));
-
-router.post('/paypal/capture', requireUser, rateLimit({ max: 20 }), wrap(async (req, res) => {
-  const order = ownOrder(req);
-  if (order.status === 'paid') return res.json({ order: publicOrder(order) });
-  if (order.method !== 'paypal' || !order.paypal_order_id || order.status !== 'pending') throw new HttpError(400, 'This order cannot be captured.');
-
-  let result;
-  try {
-    result = await paypal.captureOrder(order.paypal_order_id);
-  } catch (e) {
-    if (JSON.stringify(e.paypal || {}).includes('ORDER_ALREADY_CAPTURED')) result = await paypal.getOrder(order.paypal_order_id);
-    else { log(req, 'paypal.capture_failed', order.number, e.message); throw new HttpError(402, 'The payment was not completed. No money was taken.'); }
-  }
-
-  // Verify that the money actually arrived and matches this order exactly.
-  const unit = result?.purchase_units?.[0];
-  const capture = unit?.payments?.captures?.[0];
-  const ok = result?.status === 'COMPLETED' && capture?.status === 'COMPLETED'
-    && capture.amount?.currency_code === order.currency && capture.amount?.value === paypal.fmt(order.total_cents)
-    && String(unit?.custom_id || unit?.reference_id) === String(order.id);
-  if (!ok) {
-    log(req, 'paypal.verify_failed', order.number, { status: result?.status, capture: capture?.status, amount: capture?.amount });
-    if (capture?.status === 'PENDING') throw new HttpError(202, 'PayPal is still processing this payment. You will get an email once it clears.');
-    throw new HttpError(402, 'The payment could not be verified. Contact us with your order number.');
-  }
-  const paid = await fulfil(order, { captureId: capture.id, payerEmail: result?.payer?.email_address }, req);
-  res.json({ order: publicOrder(paid) });
 }));
 
 router.post('/paypal/cancel', requireUser, (req, res) => {

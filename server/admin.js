@@ -16,7 +16,7 @@ router.use(requireAdmin);
 router.use(accounts);
 router.use(require('./backup').router);
 router.use(require('./reactions').admin);
-router.use(require('./paypal-notify').admin);
+router.use(paypal.admin);
 
 const J = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const day = (t) => new Date(t).toISOString().slice(0, 10);
@@ -89,7 +89,7 @@ router.get('/stats', (req, res) => {
     recentOrders: all('SELECT id, number, email, status, total_cents, currency, method_label, created_at FROM orders ORDER BY created_at DESC LIMIT 6'),
     recentLogs: all('SELECT * FROM logs ORDER BY at DESC LIMIT 8'),
     integrations: {
-      paypal: paypal.configured(), paypalEnv: process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox',
+      paypal: paypal.configured(), paypalEnv: paypal.sandbox() ? 'sandbox' : 'live',
       google: !!process.env.GOOGLE_CLIENT_ID, smtp: smtpConfigured(), drive: video.driveConfigured(),
     },
   });
@@ -111,6 +111,10 @@ function sanitizeSettings(key, body) {
     else out[k] = str(v, 5000);
   }
   if (key === 'checkout' && out.currency) out.currency = out.currency.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'EUR';
+  if (key === 'checkout' && out.paypalEmail !== undefined) {
+    out.paypalEmail = out.paypalEmail.trim().toLowerCase();
+    if (out.paypalEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(out.paypalEmail)) throw new HttpError(400, 'Enter the email of your PayPal account.');
+  }
   return out;
 }
 router.get('/settings/:key', (req, res) => res.json(getSetting(req.params.key)));
@@ -456,7 +460,7 @@ router.delete('/discounts/:id', (req, res) => {
 /* ================= payment methods ================= */
 router.get('/payment-methods', (_req, res) => res.json({
   methods: all('SELECT * FROM payment_methods ORDER BY sort, id'),
-  paypal: { configured: paypal.configured(), env: process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox' },
+  paypal: { configured: paypal.configured(), env: paypal.sandbox() ? 'sandbox' : 'live' },
 }));
 function pmFromBody(b, ex = {}) {
   return {

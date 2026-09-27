@@ -27,14 +27,6 @@ services:
         sync: false          # e.g. https://ezro.onrender.com or your own domain
       - key: GOOGLE_CLIENT_ID
         sync: false
-      - key: PAYPAL_ENV
-        value: sandbox
-      - key: PAYPAL_CLIENT_ID
-        sync: false
-      - key: PAYPAL_CLIENT_SECRET
-        sync: false
-      - key: PAYPAL_WEBHOOK_ID
-        sync: false          # from developer.paypal.com → your app → Webhooks
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

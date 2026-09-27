@@ -122,8 +122,53 @@
     if (legacy) history.replaceState({}, '', `/product/${legacy[1]}`);
     route();
     heroScroll();
+    // back from PayPal's payment page
+    const ppState = params.get('paypal');
+    if (ppState) { const oid = Number(params.get('order')); history.replaceState(history.state, '', '/'); if (ppState === 'return') paypalReturn(oid); else paypalCancelled(oid); }
     // links like /#shop (e.g. "Browse the shop" on the profile page) open the products
     if (location.hash === '#shop') { history.replaceState(history.state, '', '/'); goToProducts(); }
+  }
+  // PayPal sends the buyer back here; the payment itself is confirmed by PayPal's IPN, so wait for it.
+  function paypalReturn(orderId) {
+    if (!orderId) return;
+    let stopped = false;
+    const s = sheet({ title: 'Payment', onClose: () => { stopped = true; }, body: h('div', { class: 'success pp-confirm' }, h('div', { class: 'pp-ring' }, h('span', { html: icon('lock') })),
+      h('h3', {}, 'Confirming your payment'), h('p', { class: 'muted' }, 'PayPal is confirming the payment — this usually takes a few seconds…')) });
+    const t0 = Date.now();
+    const check = async () => {
+      if (stopped) return;
+      let o = null;
+      try { o = (await api(`/api/shop/orders/${orderId}`)).order; } catch { /* signed out or gone */ }
+      if (o?.status === 'paid') {
+        S.cart = []; S.code = ''; E.store.set('ezro-code', ''); saveCart(); E.store.set('ezro-pp-order', '');
+        loadOwned().then(() => renderProducts());
+        const c = S.site.checkout;
+        s.setBody(h('div', {}, h('div', { class: 'success' },
+          h('div', { html: '<svg class="check-anim" viewBox="0 0 88 88" aria-hidden="true"><circle cx="44" cy="44" r="40"/><path d="M27 45l12 12 23-25"/></svg>' }),
+          h('h3', {}, c.successTitle), h('p', { class: 'muted', style: { marginTop: '6px' } }, c.successMessage), h('p', { class: 'chip', style: { marginTop: '14px' } }, `Order ${o.number}`)),
+          o.keys?.length ? h('div', { class: 'keybox' }, h('div', { class: 'label' }, o.keys.length > 1 ? 'Your redeem codes' : 'Your redeem code'),
+            o.keys.map((k) => h('div', {}, h('div', { class: 'muted', style: { fontSize: '13px', marginTop: '8px' } }, k.product_title), h('div', { class: 'mono', style: { fontSize: '17px', fontWeight: 700 } }, k.key)))) : null));
+        s.setFoot([h('div', { class: 'spacer' }), h('a', { class: 'btn primary', href: `/watch?order=${o.id}` }, iconEl('user'), 'Open my profile')]);
+        return;
+      }
+      if (o && ['failed', 'cancelled', 'refunded'].includes(o.status)) {
+        s.setBody(h('div', { class: 'empty' }, iconEl('close'), 'The payment was not completed. No code was created.'));
+        return;
+      }
+      if (Date.now() - t0 > 90_000) {
+        s.setBody(h('div', { class: 'success' }, h('h3', {}, 'Almost there'), h('p', { class: 'muted', style: { marginTop: '6px' } },
+          'PayPal is still confirming this payment. Your redeem code appears in your profile automatically as soon as it’s confirmed — you can close this.')));
+        s.setFoot([h('div', { class: 'spacer' }), h('a', { class: 'btn primary', href: '/watch' }, 'Open my profile')]);
+        return;
+      }
+      setTimeout(check, 2500);
+    };
+    check();
+  }
+  function paypalCancelled(orderId) {
+    if (orderId) api('/api/shop/paypal/cancel', { body: { orderId } }).catch(() => {});
+    E.store.set('ezro-pp-order', '');
+    toast('Payment cancelled — nothing was charged');
   }
   // Opens the products: the PRODUCTS category if it has products, otherwise the shop section with everything.
   // Waits until the home page is really showing (page change + intro), so nothing scrolls it back afterwards.
@@ -1048,15 +1093,28 @@
         if (!st.method) return;
         if (st.method === 'paypal') {
           if (blocked) { payArea.append(h('p', { class: 'muted', style: { textAlign: 'center', fontSize: '13px' } }, 'Accept the terms to show the PayPal button.')); return; }
-          // a calm, branded frame around PayPal's own buttons
-          const slot = h('div', { class: 'paypal-slot' }, h('div', { class: 'pp-skel' }, h('span'), h('span')));
+          // the buyer pays on PayPal's own page (balance, bank or card); PayPal confirms it to us by IPN
+          const go = h('button', { class: 'pp-go', type: 'button' }, h('span', { class: 'pp-go-ic', html: icon('paypal') }), h('span', {}, 'Pay with PayPal'), iconEl('arrow'));
+          go.onclick = async () => {
+            if (go.disabled) return;
+            go.disabled = true; go.classList.add('loading');
+            try {
+              const r = await api('/api/shop/checkout', { body: { productIds: S.cart, code: S.code, method: 'paypal', acceptTerms: st.terms } });
+              if (r.order.status === 'paid') { done(r.order); return; }
+              E.store.set('ezro-pp-order', r.order.id);
+              go.querySelector('span:nth-child(2)').textContent = 'Opening PayPal…';
+              const f = h('form', { method: 'post', action: r.paypal.action, style: { display: 'none' } },
+                Object.entries(r.paypal.fields).map(([k, v]) => h('input', { type: 'hidden', name: k, value: v })));
+              document.body.append(f); f.submit();
+            } catch (e) { fail(e); go.disabled = false; go.classList.remove('loading'); }
+          };
           payArea.append(h('div', { class: 'pp-box' },
             h('div', { class: 'pp-box-head' }, h('span', { class: 'pp-lock', html: icon('lock') }),
-              h('div', {}, h('strong', {}, 'Secure checkout'), h('span', {}, 'PayPal balance, card or Pay Later')),
+              h('div', {}, h('strong', {}, 'Secure checkout'), h('span', {}, 'PayPal balance, bank or card')),
               h('div', { class: 'pp-amount' }, h('span', {}, 'Total'), h('strong', {}, money(q.total_cents)))),
-            slot,
-            h('div', { class: 'pp-box-foot' }, iconEl('shield'), 'Encrypted by PayPal · we never see your card details')));
-          renderPayPal(slot);
+            h('div', { class: 'paypal-slot' }, go,
+              h('p', { class: 'pp-note' }, 'You continue on PayPal’s own page and come back here once it’s paid. Your code appears as soon as PayPal confirms the payment.')),
+            h('div', { class: 'pp-box-foot' }, iconEl('shield'), c.paypal?.sandbox ? 'PayPal sandbox (test mode)' : 'Paid on paypal.com · we never see your card details')));
           return;
         }
         const label = st.method === 'free' ? 'Get it now' : st.method === 'dev' ? `Pay ${money(q.total_cents)} (test)` : `Place order · ${money(q.total_cents)}`;
@@ -1070,43 +1128,6 @@
         payArea.append(btn);
       }
       renderAction();
-    }
-
-    let paypalScript = null;
-    function loadPayPal() {
-      const c = S.site.checkout;
-      if (window.paypal?.Buttons) return Promise.resolve();
-      paypalScript ||= new Promise((res, rej) => {
-        const u = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(c.paypal.clientId)}&currency=${encodeURIComponent(c.currency)}&intent=capture&components=buttons`;
-        const el = h('script', { src: u, 'data-namespace': 'paypal' });
-        el.onload = res; el.onerror = () => rej(new Error('PayPal could not load. Check your connection or ad-blocker.'));
-        document.head.append(el);
-      });
-      return paypalScript;
-    }
-    async function renderPayPal(slot) {
-      try { await loadPayPal(); } catch (e) { slot.replaceChildren(h('div', { class: 'empty' }, e.message)); return; }
-      slot.replaceChildren();
-      let orderId = null;
-      window.paypal.Buttons({
-        style: { layout: 'vertical', shape: 'pill', color: document.documentElement.dataset.theme === 'light' ? 'black' : 'white', label: 'pay', height: 48, disableMaxWidth: true },
-        // data.paymentSource = the button pressed: 'paypal' (balance / bank / saved card) or 'card' (no PayPal account needed)
-        createOrder: async (data) => {
-          const r = await api('/api/shop/checkout', { body: { productIds: S.cart, code: S.code, method: 'paypal', paypalSource: data?.paymentSource || 'paypal', acceptTerms: st.terms } }).catch((e) => { fail(e); throw e; });
-          orderId = r.order.id;
-          if (r.order.status === 'paid') { done(r.order); throw new Error('free'); }
-          return r.paypalOrderId;
-        },
-        onApprove: async () => {
-          s.setBody(h('div', { class: 'success pp-confirm' }, h('div', { class: 'pp-ring' }, h('span', { html: icon('lock') })),
-            h('h3', {}, 'Confirming your payment'), h('p', { class: 'muted' }, 'Checking with PayPal that the payment went through — one moment…')));
-          s.setFoot([]);
-          try { const r = await api('/api/shop/paypal/capture', { body: { orderId } }); done(r.order); }
-          catch (e) { fail(e); renderPay(); }
-        },
-        onCancel: () => { if (orderId) api('/api/shop/paypal/cancel', { body: { orderId } }).catch(() => {}); toast('Payment cancelled'); },
-        onError: (err) => { if (String(err?.message) !== 'free') { console.error('PayPal:', err); toast('PayPal ran into a problem. Please try again.', 'error'); } },
-      }).render(slot);
     }
 
     function done(order) {

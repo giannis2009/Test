@@ -207,8 +207,8 @@
         setTimeout(() => { ov.remove(); if (!openSheets.length) document.body.style.overflow = ''; prevFocus?.focus?.(); }, 260);
         onClose?.(result);
       },
-      setFoot(nodes) { let f = $('.sheet-foot', panel); if (!f) { f = h('div', { class: 'sheet-foot' }); panel.append(f); } f.replaceChildren(...[nodes].flat()); },
-      setBody(nodes) { api.body.replaceChildren(...[nodes].flat()); },
+      setFoot(nodes) { let f = $('.sheet-foot', panel); if (!f) { f = h('div', { class: 'sheet-foot' }); panel.append(f); } f.replaceChildren(...[nodes].flat().filter((n) => n != null && n !== false)); },
+      setBody(nodes) { api.body.replaceChildren(...[nodes].flat().filter((n) => n != null && n !== false)); },
     };
     closeBtn.onclick = () => api.close();
     ov.addEventListener('mousedown', (e) => { if (e.target === ov) api.close(); });

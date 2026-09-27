@@ -63,9 +63,6 @@ exit /b 0
 > .env echo PORT=3000
 >> .env echo PUBLIC_URL=http://localhost:3000
 >> .env echo DEV_LOGIN=1
->> .env echo # Fill these in later for real Google login / PayPal / email - see .env.example
+>> .env echo # Fill these in later for real Google login / email - see .env.example
 >> .env echo GOOGLE_CLIENT_ID=
->> .env echo PAYPAL_ENV=sandbox
->> .env echo PAYPAL_CLIENT_ID=
->> .env echo PAYPAL_CLIENT_SECRET=
 exit /b 0

@@ -264,7 +264,8 @@
   /* ================= Payments & Checkout ================= */
   A.pages.payments = async () => {
     const [{ methods, paypal }, c, notes] = await Promise.all([api('/api/admin/payment-methods'), api('/api/admin/settings/checkout'), api('/api/admin/paypal/notifications').catch(() => ({ events: [] }))]);
-    const pp = { enabled: toggle(c.paypalEnabled, 'Show PayPal at checkout'), label: input(c.paypalLabel), desc: input(c.paypalDescription) };
+    const pp = { enabled: toggle(c.paypalEnabled, 'Show PayPal at checkout'), label: input(c.paypalLabel), desc: input(c.paypalDescription),
+      email: input(c.paypalEmail, { type: 'email', placeholder: 'you@example.com', autocomplete: 'off' }), sandbox: toggle(c.paypalSandbox, 'Sandbox (test mode) — no real money') };
     const co = {
       currency: select(['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'AUD', 'PLN', 'SEK', 'NOK', 'DKK', 'CZK', 'HUF', 'JPY'].map((x) => [x, x]), c.currency),
       tax: input(c.taxPercent, { type: 'number', min: '0', max: '50', step: '0.1' }), taxLabel: input(c.taxLabel), taxIncluded: toggle(c.taxIncluded, 'Prices already include tax'),
@@ -272,7 +273,7 @@
       button: input(c.buttonText), sTitle: input(c.successTitle), sMsg: textarea(c.successMessage, { style: { minHeight: '64px' } }),
     };
     const savePP = h('button', { class: 'btn primary' }, 'Save PayPal');
-    savePP.onclick = () => A.saveSettings('checkout', { paypalEnabled: pp.enabled.checked, paypalLabel: pp.label.value, paypalDescription: pp.desc.value }, savePP);
+    savePP.onclick = async () => { const r = await A.saveSettings('checkout', { paypalEnabled: pp.enabled.checked, paypalLabel: pp.label.value, paypalDescription: pp.desc.value, paypalEmail: pp.email.value, paypalSandbox: pp.sandbox.checked }, savePP); if (r) A.refresh(); };
     const saveCo = h('button', { class: 'btn primary' }, 'Save checkout');
     saveCo.onclick = () => A.saveSettings('checkout', { currency: co.currency.value, taxPercent: Number(co.tax.value) || 0, taxLabel: co.taxLabel.value, taxIncluded: co.taxIncluded.checked, requireTerms: co.requireTerms.checked, termsText: co.terms.value, buttonText: co.button.value, successTitle: co.sTitle.value, successMessage: co.sMsg.value }, saveCo);
 
@@ -292,21 +293,23 @@
       h('div', { class: 'tt' }, h('strong', {}, e.type || '—', e.number ? h('span', { class: 'chip', style: { marginLeft: '8px', display: 'inline-flex', verticalAlign: 'middle' } }, e.number) : null),
         h('span', {}, `${e.source === 'ipn' ? 'IPN' : 'Webhook'} · ${e.result} · ${E.timeAgo(e.received_at)}`)))))
       : h('div', { class: 'empty', style: { padding: '18px' } }, 'No notifications received yet.');
-    const notifyPanel = A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, 'PayPal notifications',
-      h('span', { class: `chip ${notes.webhookId ? 'good' : 'warn'}` }, notes.webhookId ? 'Webhook ready' : 'PAYPAL_WEBHOOK_ID missing')),
-      h('p', { class: 'desc' }, 'PayPal tells the site directly when a payment completes, is refunded or reversed — even if the buyer closed the page. Codes are delivered or revoked automatically, and every message is verified with PayPal first.'),
+    const notifyPanel = A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, 'PayPal IPN',
+      h('span', { class: `chip ${notes.configured ? 'good' : 'warn'}` }, notes.configured ? 'Listening' : 'Add your PayPal email')),
+      h('p', { class: 'desc' }, 'PayPal confirms every payment, refund and reversal to this address. The site checks each message with PayPal, then delivers or revokes the codes — even if the buyer closed the page.'),
       h('div', { class: 'form' },
-        urlRow('Webhook URL', '/api/paypal/webhook', 'developer.paypal.com → your app → Webhooks → Add webhook → “All events”. Then put the Webhook ID in .env as PAYPAL_WEBHOOK_ID.'),
-        urlRow('IPN URL (optional)', '/api/paypal/ipn', 'paypal.com → Settings → Website payments → Instant payment notifications → Notification URL.'),
-        /localhost|127\.0\.0\.1/.test(base) ? h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--warn)' } }, 'PayPal cannot reach localhost — these work once the site is online (Render / your domain).') : null),
+        urlRow('IPN URL', '/api/paypal/ipn', 'Sent to PayPal with every payment automatically. For extra safety also add it in paypal.com → Settings → Website payments → Instant payment notifications.'),
+        /localhost|127\.0\.0\.1/.test(base) ? h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--warn)' } }, 'PayPal cannot reach localhost — payments are confirmed once the site is online (Render / your domain).') : null),
       h('div', { class: 'panel-title', style: { margin: '18px 0 8px' } }, h('span', { class: 'dot' }), 'Latest notifications'), evRows);
 
     return [A.head('Payments & Checkout', 'PayPal, your own payment methods, and everything the checkout shows.'),
       h('div', { class: 'page' }, h('div', { class: 'split' },
         h('div', { style: { display: 'grid', gap: '18px' } },
-          A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, 'PayPal', h('span', { class: `chip ${paypal.configured ? 'good' : 'warn'}` }, paypal.configured ? `Connected · ${paypal.env}` : 'Keys missing in .env')),
-            h('p', { class: 'desc' }, 'Payments are captured and verified on the server — the key is only sent after PayPal confirms the exact amount arrived.'),
-            h('div', { class: 'form' }, pp.enabled, h('div', { class: 'row' }, field('Label', pp.label), field('Description', pp.desc)), h('div', { class: 'form-actions' }, savePP))),
+          A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, 'PayPal', h('span', { class: `chip ${paypal.configured ? 'good' : 'warn'}` }, paypal.configured ? `Ready · ${paypal.env}` : 'Add your PayPal email')),
+            h('p', { class: 'desc' }, 'Buyers pay on PayPal’s own page — from their PayPal balance, bank or card. The redeem code is created only after PayPal confirms the exact amount (IPN).'),
+            h('div', { class: 'form' }, pp.enabled,
+              field('Your PayPal email', pp.email, 'The PayPal account that receives the money. Tip: in PayPal → Website preferences, turn on “PayPal account optional” so buyers can also pay by card without an account.'),
+              pp.sandbox,
+              h('div', { class: 'row' }, field('Label', pp.label), field('Description', pp.desc)), h('div', { class: 'form-actions' }, savePP))),
           notifyPanel,
           A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 } }, 'Your payment methods', h('span', { style: { marginLeft: 'auto' } }, A.btn('Add method', 'plus', () => editMethod(null), 'sm'))),
             h('p', { class: 'desc' }, 'Bank transfer, IRIS, Revolut, crypto… The customer sees your instructions, the order waits as “Pending” and you confirm it in Orders — then the redeem code appears in their profile.'),
