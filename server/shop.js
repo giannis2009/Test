@@ -2,7 +2,6 @@ const express = require('express');
 const { all, get, run, tx, now, getSetting, setSetting } = require('./db');
 const { requireUser } = require('./auth');
 const paypal = require('./paypal');
-const { sendInvoice, renderInvoice } = require('./mailer');
 const { licenseKey, log, rateLimit, str, int, bool, HttpError, wrap } = require('./util');
 
 const DEV_PAY = process.env.DEV_LOGIN === '1' && process.env.NODE_ENV !== 'production';
@@ -55,6 +54,25 @@ function quote(productIds, code) {
   };
 }
 
+/* One purchase per product per account: owned = has an active key; pending = waiting for a manual payment. */
+function ownership(user) {
+  if (!user) return { owned: [], pending: [] };
+  const owned = all('SELECT DISTINCT product_id FROM licenses WHERE revoked = 0 AND product_id IS NOT NULL AND (user_id = ? OR email = ?)', user.id, user.email)
+    .map((r) => r.product_id);
+  const pending = [];
+  for (const o of all("SELECT items FROM orders WHERE user_id = ? AND status = 'pending' AND method LIKE 'pm:%'", user.id)) {
+    for (const it of JSON.parse(o.items)) if (!owned.includes(it.product_id)) pending.push(it.product_id);
+  }
+  return { owned, pending: [...new Set(pending)] };
+}
+function assertNotOwned(user, q) {
+  const { owned, pending } = ownership(user);
+  for (const it of q.items) {
+    if (owned.includes(it.product_id)) throw new HttpError(409, `You already own "${it.title}". You'll find its code in your profile.`);
+    if (pending.includes(it.product_id)) throw new HttpError(409, `"${it.title}" is already in an order waiting for payment.`);
+  }
+}
+
 function nextOrderNumber() {
   const inv = getSetting('invoice');
   const n = int(inv.nextNumber, 1001);
@@ -73,7 +91,7 @@ function createOrder(user, q, method, methodLabel) {
   });
 }
 
-/* Marks an order paid, issues one access key per item and emails the invoice. Safe to call twice. */
+/* Marks an order paid and issues one redeem code per item (never a second one for a product the buyer already owns). Safe to call twice. */
 async function fulfil(order, extra = {}, req = null) {
   const done = tx(() => {
     const fresh = get('SELECT * FROM orders WHERE id = ?', order.id);
@@ -81,6 +99,7 @@ async function fulfil(order, extra = {}, req = null) {
     run(`UPDATE orders SET status = 'paid', paid_at = ?, paypal_capture_id = COALESCE(?, paypal_capture_id),
          payer_email = COALESCE(?, payer_email) WHERE id = ?`, now(), extra.captureId || null, extra.payerEmail || null, order.id);
     for (const it of JSON.parse(fresh.items)) {
+      if (get('SELECT 1 FROM licenses WHERE product_id = ? AND revoked = 0 AND (user_id = ? OR email = ?)', it.product_id, fresh.user_id, fresh.email)) continue;
       run('INSERT INTO licenses (key, order_id, product_id, product_title, user_id, email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
         licenseKey(), order.id, it.product_id, it.title, fresh.user_id, fresh.email, now());
       run('UPDATE products SET stock = stock - 1 WHERE id = ? AND stock IS NOT NULL AND stock > 0', it.product_id);
@@ -91,12 +110,6 @@ async function fulfil(order, extra = {}, req = null) {
   if (!done) return get('SELECT * FROM orders WHERE id = ?', order.id);
   const paid = get('SELECT * FROM orders WHERE id = ?', order.id);
   log(req || 'system', 'order.paid', paid.number, { total: paid.total_cents / 100, currency: paid.currency, method: paid.method_label, capture: extra.captureId || null });
-  try {
-    await sendInvoice(paid);
-    run('UPDATE orders SET invoice_sent_at = ? WHERE id = ?', now(), paid.id);
-  } catch (e) {
-    log('system', 'mail.error', paid.number, e.message);
-  }
   return paid;
 }
 
@@ -119,13 +132,18 @@ function ownOrder(req) {
 const router = express.Router();
 
 router.post('/quote', rateLimit({ max: 60 }), (req, res) => {
-  res.json(quote(req.body?.productIds, req.body?.code));
+  const q = quote(req.body?.productIds, req.body?.code);
+  if (req.user) assertNotOwned(req.user, q);
+  res.json(q);
 });
+
+router.get('/owned', (req, res) => res.json(ownership(req.user)));
 
 router.post('/checkout', requireUser, rateLimit({ max: 15 }), wrap(async (req, res) => {
   const checkout = getSetting('checkout');
   if (checkout.requireTerms && !bool(req.body?.acceptTerms)) throw new HttpError(400, 'Please accept the terms first.');
   const q = quote(req.body?.productIds, req.body?.code);
+  assertNotOwned(req.user, q);
   const method = str(req.body?.method, 40);
 
   if (q.total_cents === 0) {
@@ -161,7 +179,6 @@ router.post('/checkout', requireUser, rateLimit({ max: 15 }), wrap(async (req, r
   const order = createOrder(req.user, q, `pm:${pm.id}`, pm.name);
   log(req, 'order.created', order.number, { method: pm.name, total: order.total_cents / 100 });
   const instructions = pm.instructions.replaceAll('{number}', order.number);
-  sendInvoice(order, { instructions: pm.instructions }).catch((e) => log('system', 'mail.error', order.number, e.message));
   res.json({ order: publicOrder(order), instructions });
 }));
 
@@ -214,12 +231,4 @@ router.post('/notify', requireUser, rateLimit({ max: 20 }), (req, res) => {
   res.json({ ok: true });
 });
 
-/* Online invoice: owner or admin only. */
-function invoicePage(req, res) {
-  const o = get('SELECT * FROM orders WHERE number = ?', str(req.params.number, 60));
-  if (!o || !req.user || (o.user_id !== req.user.id && !req.user.isAdmin)) return res.status(404).send('Invoice not found. Sign in with the account that placed the order.');
-  res.setHeader('Cache-Control', 'no-store');
-  res.send(renderInvoice(o));
-}
-
-module.exports = { router, fulfil, publicOrder, invoicePage, DEV_PAY, quote };
+module.exports = { router, fulfil, publicOrder, DEV_PAY, quote };

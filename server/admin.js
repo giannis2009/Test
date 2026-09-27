@@ -3,10 +3,10 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const express = require('express');
 const multer = require('multer');
-const { all, get, run, tx, now, getSetting, setSetting, DEFAULTS, UPLOAD_DIR, SECURE_DIR } = require('./db');
+const { db, all, get, run, tx, now, getSetting, setSetting, DEFAULTS, UPLOAD_DIR, SECURE_DIR } = require('./db');
 const { requireAdmin, isOwner, ownerEmails } = require('./auth');
 const { fulfil } = require('./shop');
-const { renderInvoice, sendInvoice, send, smtpConfigured } = require('./mailer');
+const { send, smtpConfigured } = require('./mailer');
 const paypal = require('./paypal');
 const video = require('./video');
 const { log, str, int, bool, cents, slugify, safeUrl, hex, money, HttpError, wrap } = require('./util');
@@ -363,14 +363,6 @@ router.post('/orders/:id/note', (req, res) => {
   run('UPDATE orders SET admin_note = ? WHERE id = ?', str(req.body?.note, 2000), int(req.params.id));
   res.json({ ok: true });
 });
-router.post('/orders/:id/resend', wrap(async (req, res) => {
-  const o = get('SELECT * FROM orders WHERE id = ?', int(req.params.id));
-  if (!o) throw new HttpError(404, 'Not found');
-  await sendInvoice(o);
-  run('UPDATE orders SET invoice_sent_at = ? WHERE id = ?', now(), o.id);
-  log(req, 'invoice.resend', o.number, o.email);
-  res.json({ ok: true });
-}));
 router.post('/licenses/:id/revoke', (req, res) => {
   const l = get('SELECT * FROM licenses WHERE id = ?', int(req.params.id));
   if (!l) throw new HttpError(404, 'Not found');
@@ -454,27 +446,6 @@ router.delete('/payment-methods/:id', (req, res) => {
   log(req, 'payment_method.remove', ex.name);
   res.json({ ok: true });
 });
-
-/* ================= invoice ================= */
-const SAMPLE_ORDER = () => ({
-  id: 0, number: `${getSetting('invoice').prefix}1001`, email: 'customer@gmail.com', name: 'Alex Customer', status: 'paid',
-  method: 'paypal', method_label: 'PayPal', subtotal_cents: 4900, discount_cents: 490, tax_cents: 0, total_cents: 4410,
-  currency: getSetting('checkout').currency, discount_code: 'WELCOME10', payer_email: 'alex.paypal@gmail.com', paypal_capture_id: '8MC585209K746392H',
-  items: [{ title: 'Cinematic VFX Pack', subtitle: 'Project files + tutorial', price_cents: 4900, qty: 1 }], created_at: Date.now(), paid_at: Date.now(),
-});
-router.post('/invoice/preview', (req, res) => {
-  const override = sanitizeSettings('invoice', req.body || {});
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(renderInvoice(SAMPLE_ORDER(), { override, keys: [{ key: 'EZRO-ABCD-EFGH-JKLM-NPQR', product_title: 'Cinematic VFX Pack' }] }));
-});
-router.post('/invoice/test', wrap(async (req, res) => {
-  const inv = getSetting('invoice');
-  const order = { ...SAMPLE_ORDER(), email: req.user.email };
-  await send({ to: req.user.email, subject: `[Test] ${inv.subject.replace('{number}', order.number)}`, tag: 'test',
-    html: renderInvoice(order, { keys: [{ key: 'EZRO-TEST-TEST-TEST-TEST', product_title: 'Cinematic VFX Pack' }] }) });
-  log(req, 'invoice.test_sent', req.user.email);
-  res.json({ ok: true, smtp: smtpConfigured() });
-}));
 
 /* ================= socials ================= */
 router.get('/socials', (_req, res) => res.json({ socials: all('SELECT * FROM socials ORDER BY sort, id') }));
@@ -575,6 +546,47 @@ router.delete('/tasks/:id', (req, res) => {
   if (!ex) throw new HttpError(404, 'Not found');
   run('DELETE FROM tasks WHERE id = ?', ex.id);
   log(req, 'task.remove', ex.title);
+  res.json({ ok: true });
+});
+
+/* ================= reset / danger zone (owner only) ================= */
+const RESETS = {
+  logs: { label: 'Activity logs', run: () => run('DELETE FROM logs') },
+  analytics: { label: 'Visitor statistics', run: () => run('DELETE FROM views') },
+  orders: {
+    label: 'Orders & redeem codes',
+    run: () => { run('DELETE FROM licenses'); run('DELETE FROM orders'); run('UPDATE discounts SET uses = 0'); },
+  },
+  customers: {
+    label: 'Customer accounts',
+    // admins keep their accounts; everyone else is signed out and removed together with their orders
+    run: () => {
+      const keep = [...ownerEmails(), ...all('SELECT email FROM admins').map((a) => a.email)];
+      const ph = keep.map(() => '?').join(',') || "''";
+      run(`DELETE FROM licenses WHERE email NOT IN (${ph})`, ...keep);
+      run(`DELETE FROM orders WHERE email NOT IN (${ph})`, ...keep);
+      run(`DELETE FROM users WHERE email NOT IN (${ph})`, ...keep);
+    },
+  },
+  tasks: { label: 'Tasks', run: () => run('DELETE FROM tasks') },
+  notify: { label: '“Notify me” sign-ups', run: () => run('DELETE FROM product_notify') },
+};
+router.get('/reset', (req, res) => res.json({
+  canReset: isOwner(req.user.email),
+  counts: {
+    logs: get('SELECT COUNT(*) n FROM logs').n, analytics: get('SELECT COUNT(*) n FROM views').n,
+    orders: get('SELECT COUNT(*) n FROM orders').n, customers: get('SELECT COUNT(*) n FROM users').n,
+    tasks: get('SELECT COUNT(*) n FROM tasks').n, notify: get('SELECT COUNT(*) n FROM product_notify').n,
+  },
+}));
+router.post('/reset', (req, res) => {
+  if (!isOwner(req.user.email)) throw new HttpError(403, 'Only the owner can reset data.');
+  if (str(req.body?.confirm, 10) !== 'RESET') throw new HttpError(400, 'Type RESET to confirm.');
+  const what = (Array.isArray(req.body?.what) ? req.body.what : []).filter((k) => RESETS[k]);
+  if (!what.length) throw new HttpError(400, 'Choose what to reset.');
+  tx(() => what.forEach((k) => RESETS[k].run()));
+  if (what.includes('analytics') || what.includes('orders')) db.exec('VACUUM');
+  log(req, 'admin.reset', what.map((k) => RESETS[k].label).join(', '));
   res.json({ ok: true });
 });
 

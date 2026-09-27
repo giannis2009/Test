@@ -69,7 +69,6 @@ app.use('/api/watch', watch.router);
 app.use('/api/admin', admin.router);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
-app.get('/invoice/:number', shop.invoicePage);
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d', fallthrough: false }));
 // No browser caching locally, so every change shows up on a normal refresh.
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'], maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));

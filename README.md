@@ -13,7 +13,6 @@ Portfolio, shop, secure video delivery and a full admin panel for **Ezro**.
 | `/` | Logo, socials, portfolio ανά κατηγορία (COVER ART, 3D ART, BRANDING, PRODUCTS), shop, καλάθι και checkout |
 | `/watch` | **Video Review**: ο πελάτης βάζει το key του και βλέπει το video με προστασία |
 | `/admin` | Admin Panel |
-| `/invoice/EZR-1001` | Online invoice (μόνο για τον αγοραστή ή admin) |
 
 **Αγορά, βήμα προς βήμα:**
 1. Ο πελάτης κάνει login με Google.

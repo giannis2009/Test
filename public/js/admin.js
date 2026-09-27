@@ -11,10 +11,10 @@
 
   const NAV = [
     ['Overview', [['dashboard', 'Dashboard', 'dashboard']]],
-    ['Store', [['orders', 'Orders', 'receipt'], ['products', 'Products', 'box'], ['discounts', 'Discounts', 'percent'], ['payments', 'Payments & Checkout', 'card'], ['invoice', 'Invoice', 'invoice']]],
+    ['Store', [['orders', 'Orders', 'receipt'], ['products', 'Products', 'box'], ['discounts', 'Discounts', 'percent'], ['payments', 'Payments & Checkout', 'card']]],
     ['Content', [['media', 'Categories & Media', 'image'], ['socials', 'Social media', 'share'], ['texts', 'Texts', 'type'], ['appearance', 'Appearance', 'palette']]],
     ['Workspace', [['tasks', 'Tasks', 'tasks'], ['customers', 'Customers', 'users']]],
-    ['System', [['security', 'Admins & Security', 'shield'], ['logs', 'Logs', 'logs']]],
+    ['System', [['security', 'Admins & Security', 'shield'], ['logs', 'Logs', 'logs'], ['reset', 'Reset data', 'refresh']]],
   ];
 
   /* ---------- shared helpers for pages ---------- */
@@ -281,6 +281,39 @@
           h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
           h('div', { class: 'form-actions' }, save))))),
     ];
+  };
+
+  /* ================= Reset data ================= */
+  Admin.pages.reset = async () => {
+    const { canReset, counts } = await api('/api/admin/reset');
+    const OPTS = [
+      ['logs', 'Activity logs', 'Every entry in Logs.', 'logs'],
+      ['analytics', 'Visitor statistics', 'Visitors and page views on the Dashboard.', 'chart'],
+      ['orders', 'Orders & redeem codes', 'All orders, their codes and discount-code usage. Revenue starts from zero.', 'receipt'],
+      ['customers', 'Customer accounts', 'Everyone except admins — with their orders and codes.', 'users'],
+      ['tasks', 'Tasks', 'Every card on the Tasks board.', 'tasks'],
+      ['notify', '“Notify me” sign-ups', 'People waiting for Coming soon products.', 'bell'],
+    ];
+    const picked = new Set();
+    const confirmIn = E.input('', { placeholder: 'Type RESET', autocomplete: 'off', style: { textTransform: 'uppercase', fontFamily: 'var(--mono)' } });
+    const go = h('button', { class: 'btn danger solid' }, iconEl('trash'), 'Reset selected');
+    const all = h('button', { class: 'btn' }, 'Select everything');
+    const rows = OPTS.map(([k, label, desc, ic]) => {
+      const t = E.toggle(false, '', (on) => { on ? picked.add(k) : picked.delete(k); });
+      return h('div', { class: 'lrow' }, h('div', { class: 'ic', html: icon(ic) }), h('div', { class: 'tt' }, h('strong', {}, label), h('span', {}, `${desc} · ${counts[k]} now`)), t);
+    });
+    all.onclick = () => rows.forEach((r) => { const t = r.lastChild; if (!t.checked) { t.checked = true; t.querySelector('input').dispatchEvent(new Event('change')); } });
+    go.onclick = () => withBusy(go, async () => {
+      if (!picked.size) { toast('Choose what to reset', 'error'); return; }
+      if (confirmIn.value.trim().toUpperCase() !== 'RESET') { toast('Type RESET to confirm', 'error'); confirmIn.focus(); return; }
+      if (!(await E.confirmDialog('Delete for good?', 'This cannot be undone.', { ok: 'Reset', danger: true }))) return;
+      try { await api('/api/admin/reset', { body: { what: [...picked], confirm: 'RESET' } }); toast('Done — data reset', 'success'); Admin.refresh(); } catch (e) { fail(e); }
+    });
+    return [Admin.head('Reset data', 'Start fresh — clear test orders, statistics and logs. Products, albums, texts and settings are never touched.'),
+      h('div', { class: 'page' }, canReset
+        ? Admin.panel('Choose what to clear', h('div', { class: 'list' }, rows),
+          h('div', { class: 'input-group', style: { marginTop: '18px', flexWrap: 'wrap' } }, all, h('span', { style: { flex: 1 } }), confirmIn, go))
+        : h('div', { class: 'empty' }, iconEl('lock'), 'Only the owner (ADMIN_EMAILS in .env) can reset data.'))];
   };
 
   boot();

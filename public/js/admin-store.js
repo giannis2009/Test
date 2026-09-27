@@ -1,5 +1,5 @@
 /* =========================================================
-   Ezro admin — Orders, Products, Discounts, Payments, Invoice
+   Ezro admin — Orders, Products, Discounts, Payments
    ========================================================= */
 (function () {
   'use strict';
@@ -25,7 +25,7 @@
     await load();
     const sub = (location.hash.match(/^#\/orders\/(\d+)/) || [])[1];
     if (sub) setTimeout(() => openOrder(Number(sub), load), 50);
-    return [A.head('Orders', 'Every purchase — verify payments, resend invoices and manage access keys.'), h('div', { class: 'page' }, h('div', { class: 'toolbar' }, search, seg), body)];
+    return [A.head('Orders', 'Every purchase — verify payments and manage redeem codes.'), h('div', { class: 'page' }, h('div', { class: 'toolbar' }, search, seg), body)];
   };
 
   async function openOrder(id, reload) {
@@ -35,20 +35,19 @@
     const note = textarea(o.admin_note, { placeholder: 'Private note (only admins see this)', style: { minHeight: '70px' } });
     note.onchange = () => api(`/api/admin/orders/${o.id}/note`, { body: { note: note.value } }).then(() => toast('Note saved', 'success')).catch(fail);
     const act = async (fn, msg) => { try { await fn(); toast(msg, 'success'); s.close(); reload?.(); } catch (e) { fail(e); } };
-    const foot = [h('a', { class: 'btn', href: `/invoice/${encodeURIComponent(o.number)}`, target: '_blank' }, iconEl('invoice'), 'Invoice'), h('div', { class: 'spacer' })];
+    const foot = [h('div', { class: 'spacer' })];
     if (o.status === 'paid') {
-      foot.push(A.btn('Resend invoice', 'mail', (e) => withBusy(e.currentTarget, () => api(`/api/admin/orders/${o.id}/resend`, { body: {} }).then(() => toast('Invoice sent', 'success')).catch(fail))));
       foot.push(A.btn('Mark refunded', 'refresh', async () => { if (await E.confirmDialog('Mark as refunded?', 'Access keys will stop working. Refund the money in PayPal separately.', { ok: 'Mark refunded', danger: true })) act(() => api(`/api/admin/orders/${o.id}/status`, { body: { status: 'refunded' } }), 'Order refunded'); }, 'danger'));
     } else {
       foot.push(A.btn('Cancel order', 'close', async () => { if (await E.confirmDialog('Cancel this order?', '', { ok: 'Cancel order', danger: true })) act(() => api(`/api/admin/orders/${o.id}/status`, { body: { status: 'cancelled' } }), 'Order cancelled'); }, 'danger'));
       foot.push(A.btn('Confirm payment', 'check', async () => {
-        if (await E.confirmDialog('Payment received?', `Only confirm once ${money(o.total_cents, cur)} has actually arrived. The customer instantly gets their key and invoice.`, { ok: 'Confirm & send key' })) act(() => api(`/api/admin/orders/${o.id}/mark-paid`, { body: {} }), 'Marked paid — key sent');
+        if (await E.confirmDialog('Payment received?', `Only confirm once ${money(o.total_cents, cur)} has actually arrived. The customer instantly gets their redeem code in their profile.`, { ok: 'Confirm & give code' })) act(() => api(`/api/admin/orders/${o.id}/mark-paid`, { body: {} }), 'Marked paid — key sent');
       }, 'primary'));
     }
     const s = sheet({
       title: `Order ${o.number}`, size: 'wide', foot,
       body: [
-        h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' } }, A.statusChip(o.status), h('span', { class: 'chip' }, o.method_label || o.method), o.invoice_sent_at ? h('span', { class: 'chip good' }, iconEl('mail'), `Invoice sent ${E.timeAgo(o.invoice_sent_at)}`) : null),
+        h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' } }, A.statusChip(o.status), h('span', { class: 'chip' }, o.method_label || o.method)),
         h('div', { class: 'grid-2' },
           h('dl', { class: 'kv' },
             h('dt', {}, 'Customer'), h('dd', {}, `${o.name || '—'} · ${o.email}`),
@@ -253,7 +252,7 @@
             h('p', { class: 'desc' }, 'Payments are captured and verified on the server — the key is only sent after PayPal confirms the exact amount arrived.'),
             h('div', { class: 'form' }, pp.enabled, h('div', { class: 'row' }, field('Label', pp.label), field('Description', pp.desc)), h('div', { class: 'form-actions' }, savePP))),
           A.panel(h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 } }, 'Your payment methods', h('span', { style: { marginLeft: 'auto' } }, A.btn('Add method', 'plus', () => editMethod(null), 'sm'))),
-            h('p', { class: 'desc' }, 'Bank transfer, IRIS, Revolut, crypto… The customer sees your instructions, the order waits as “Pending” and you confirm it in Orders — then the key is sent.'),
+            h('p', { class: 'desc' }, 'Bank transfer, IRIS, Revolut, crypto… The customer sees your instructions, the order waits as “Pending” and you confirm it in Orders — then the redeem code appears in their profile.'),
             methods.length ? list : h('div', { class: 'empty' }, 'No custom methods yet'))),
         A.panel('Checkout', h('div', { class: 'form' },
           h('div', { class: 'row' }, field('Currency', co.currency), field('Tax %', co.tax), field('Tax label', co.taxLabel)), co.taxIncluded,
@@ -280,36 +279,4 @@
       body: h('div', { class: 'form' }, h('div', { class: 'row' }, field('Name', name), field('Description', desc)), field('Icon', picker), field('Instructions for the customer', instr, 'Shown after they place the order and in their email.')) });
   }
 
-  /* ================= Invoice ================= */
-  A.pages.invoice = async () => {
-    const inv = await api('/api/admin/settings/invoice');
-    const f = {
-      companyName: input(inv.companyName), address: textarea(inv.address, { style: { minHeight: '70px' } }), vatId: input(inv.vatId), email: input(inv.email), website: input(inv.website),
-      subject: input(inv.subject), heading: input(inv.heading), intro: textarea(inv.intro, { style: { minHeight: '80px' } }), notes: textarea(inv.notes, { style: { minHeight: '70px' } }), footer: textarea(inv.footer, { style: { minHeight: '60px' } }),
-      accent: input(inv.accent, { type: 'color' }), prefix: input(inv.prefix), nextNumber: input(inv.nextNumber, { type: 'number', min: '1' }),
-      showTax: toggle(inv.showTax, 'Show tax line'), showKeys: toggle(inv.showKeys, 'Include access keys'), showPayer: toggle(inv.showPayer, 'Show PayPal payer email'),
-    };
-    const logo = E.uploadBox({ value: inv.logoUrl, label: 'Logo', onDone: () => refresh() });
-    const banner = E.uploadBox({ value: inv.bannerUrl, label: 'Optional banner image on top', onDone: () => refresh() });
-    const values = () => ({
-      ...Object.fromEntries(Object.entries(f).map(([k, el]) => [k, 'checked' in el && !(el instanceof HTMLInputElement) ? el.checked : el.value])),
-      logoUrl: logo.value, bannerUrl: banner.value, nextNumber: Number(f.nextNumber.value) || 1,
-    });
-    const frame = h('iframe', { class: 'preview-frame', title: 'Invoice preview', sandbox: '' });
-    const refresh = E.debounce(async () => { try { const r = await api('/api/admin/invoice/preview', { body: values(), raw: true }); frame.srcdoc = await r.text(); } catch (e) { fail(e); } }, 350);
-    Object.values(f).forEach((el) => { el.addEventListener('input', refresh); el.addEventListener('change', refresh); });
-    const clearBanner = h('button', { class: 'btn sm', onclick: () => { banner.set(''); refresh(); } }, 'Remove banner');
-    const save = h('button', { class: 'btn primary' }, iconEl('check'), 'Save invoice');
-    save.onclick = () => A.saveSettings('invoice', values(), save);
-    const test = h('button', { class: 'btn' }, iconEl('mail'), 'Send me a test');
-    test.onclick = () => withBusy(test, async () => { try { const r = await api('/api/admin/invoice/test', { body: {} }); toast(r.smtp ? `Test sent to ${A.me.email}` : 'SMTP not set — saved to data/outbox instead', r.smtp ? 'success' : 'info', 4000); } catch (e) { fail(e); } });
-    refresh();
-    return [A.head('Invoice', 'Design the email customers get after paying. Placeholders: {number}, {name}, {total}.', test, save),
-      h('div', { class: 'page' }, h('div', { class: 'split' },
-        h('div', { style: { display: 'grid', gap: '18px' } },
-          A.panel('Brand', h('div', { class: 'form' }, h('div', { class: 'row' }, field('Logo', logo), field('Banner', h('div', { style: { display: 'grid', gap: '8px' } }, banner, clearBanner))), h('div', { class: 'row' }, field('Business name', f.companyName), field('Accent colour', f.accent)))),
-          A.panel('Details', h('div', { class: 'form' }, field('Address', f.address), h('div', { class: 'row' }, field('VAT / Tax ID', f.vatId), field('Email', f.email), field('Website', f.website)), h('div', { class: 'row' }, field('Invoice prefix', f.prefix), field('Next number', f.nextNumber)))),
-          A.panel('Email text', h('div', { class: 'form' }, field('Subject', f.subject), field('Heading', f.heading), field('Intro', f.intro), field('Notes', f.notes), field('Footer', f.footer), f.showKeys, f.showTax, f.showPayer))),
-        A.panel('Live preview', frame)))];
-  };
 })();

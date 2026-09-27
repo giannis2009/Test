@@ -6,7 +6,7 @@
   const E = window.Ezro;
   const { h, $, $$, icon, iconEl, money, api, toast, fail, sheet, segmented, withBusy, copy, auth } = E;
 
-  const S = { site: null, products: [], media: [], cart: E.store.get('ezro-cart', []), code: E.store.get('ezro-code', '') };
+  const S = { owned: new Set(), pendingOwn: new Set(), site: null, products: [], media: [], cart: E.store.get('ezro-cart', []), code: E.store.get('ezro-code', '') };
   const saveCart = () => { E.store.set('ezro-cart', S.cart); renderNav(); };
   const params = new URLSearchParams(location.search);
 
@@ -113,6 +113,7 @@
     $$('[data-ic]').forEach((el) => el.replaceChildren(iconEl(el.dataset.ic)));
     E.watchTexts('home');
     await auth.load().catch(() => {});
+    await loadOwned();
     if (params.get('edit') === '1') {
       if (auth.user?.isAdmin) E.textEditMode('home'); else toast('Sign in as an admin to edit texts', 'error');
     } else if (window.top === window) E.track('/');
@@ -121,7 +122,19 @@
     route();
     heroScroll();
   }
-  auth.onChange(() => renderNav());
+  // what the signed-in user already owns → shown as "Owned", can't be bought twice
+  async function loadOwned() {
+    S.owned = new Set(); S.pendingOwn = new Set();
+    if (auth.user) {
+      try { const r = await api('/api/shop/owned'); S.owned = new Set(r.owned); S.pendingOwn = new Set(r.pending); } catch { /* signed out */ }
+    }
+    const before = S.cart.length;
+    S.cart = S.cart.filter((id) => !S.owned.has(id) && !S.pendingOwn.has(id));
+    if (S.cart.length !== before) saveCart();
+    if (S.site) { renderProducts(); if (location.pathname.startsWith('/product/')) route(); }
+  }
+  const ownState = (p) => (S.owned.has(p.id) ? 'owned' : S.pendingOwn.has(p.id) ? 'pending' : null);
+  auth.onChange(() => { renderNav(); if (S.site) loadOwned(); });
   // in-page links (#work, #shop) also work from a product page
   document.addEventListener('click', (e) => {
     const a = e.target.closest('a[href^="#"]');
@@ -142,7 +155,7 @@
       acc = h('button', { class: 'btn ghost account-btn', 'aria-label': 'Account' }, E.avatarEl(auth.user, 32));
       acc.onclick = () => E.popMenu(acc, (m) => {
         m.append(h('div', { class: 'menu-head' }, auth.user.email));
-        m.append(h('a', { class: 'menu-item', href: '/watch' }, iconEl('film'), 'My library'));
+        m.append(h('a', { class: 'menu-item', href: '/watch' }, iconEl('user'), 'My profile'));
         m.append(h('button', { class: 'menu-item', onclick: () => { E.closeMenus(); openOrders(); } }, iconEl('receipt'), 'My orders'));
         if (auth.user.isAdmin) m.append(h('a', { class: 'menu-item', href: '/admin' }, iconEl('dashboard'), 'Admin panel'));
         m.append(h('div', { class: 'menu-sep' }));
@@ -449,7 +462,8 @@
         h('div', { class: 'p-title' }, p.title),
         p.subtitle ? h('div', { class: 'p-sub' }, p.subtitle) : null,
         h('div', { class: 'p-foot' }, soon ? h('span', { class: 'chip brand' }, iconEl('bell'), 'Notify me') : priceEl(p),
-          !soon && !p.soldOut ? h('button', { class: 'btn icon sm primary', 'aria-label': `Add ${p.title} to cart`, html: icon('plus'), onclick: (e) => { e.stopPropagation(); addToCart(p, e.currentTarget); } }) : null)));
+          ownState(p) ? h('span', { class: `chip ${ownState(p) === 'owned' ? 'good' : 'warn'}` }, iconEl(ownState(p) === 'owned' ? 'check' : 'clock'), ownState(p) === 'owned' ? 'Owned' : 'Pending')
+          : !soon && !p.soldOut ? h('button', { class: 'btn icon sm primary', 'aria-label': `Add ${p.title} to cart`, html: icon('plus'), onclick: (e) => { e.stopPropagation(); addToCart(p, e.currentTarget); } }) : null)));
     card.onclick = () => openProduct(p, card.querySelector('.p-media img'));
     tilt(card);
     card.onkeydown = (e) => e.key === 'Enter' && card.click();
@@ -457,6 +471,8 @@
   }
 
   function addToCart(p, fromEl) {
+    if (ownState(p) === 'owned') { toast('You already own this — find its code in your profile'); return; }
+    if (ownState(p) === 'pending') { toast('This is already in an order waiting for payment'); return; }
     if (S.cart.includes(p.id)) { toast('Already in your cart'); return; }
     S.cart.push(p.id); saveCart();
     toast(`${p.title} added to cart`, 'success');
@@ -575,7 +591,10 @@
     } else {
       kids.push(h('div', { class: 'bb-price' }, h('strong', {}, p.price_cents ? money(p.price_cents) : 'Free'), p.compare_cents > p.price_cents ? h('s', {}, money(p.compare_cents)) : null, off ? h('span', { class: 'chip good' }, `Save ${off}%`) : null));
       if (p.stockLeft && !p.soldOut) kids.push(h('p', { class: 'muted', style: { fontSize: '13px' } }, `Only ${p.stockLeft} left`));
-      if (p.soldOut) kids.push(h('button', { class: 'btn lg block', disabled: true }, 'Sold out'));
+      if (ownState(p) === 'owned') kids.push(h('div', { class: 'owned-note' }, iconEl('check'), h('div', {}, h('strong', {}, 'You own this'), h('span', {}, 'Your redeem code is in your profile.'))),
+        h('a', { class: 'btn primary lg block', href: '/watch' }, iconEl('user'), 'Open my profile'));
+      else if (ownState(p) === 'pending') kids.push(h('div', { class: 'owned-note warn' }, iconEl('clock'), h('div', {}, h('strong', {}, 'Waiting for payment'), h('span', {}, 'Your code appears in your profile once the payment is confirmed.'))));
+      else if (p.soldOut) kids.push(h('button', { class: 'btn lg block', disabled: true }, 'Sold out'));
       else {
         const buy = h('button', { class: 'btn primary lg block' }, 'Buy now', iconEl('arrow'));
         buy.onclick = () => { if (!S.cart.includes(p.id)) { S.cart.push(p.id); saveCart(); } openCart(); };
@@ -585,7 +604,7 @@
     kids.push(h('div', { class: 'bb-perks' },
       h('div', {}, iconEl('shield'), 'Secure checkout with PayPal'),
       p.hasVideo ? h('div', {}, iconEl('key'), 'Personal key, linked to your Google account') : null,
-      h('div', {}, iconEl('invoice'), 'Detailed invoice by email')));
+      h('div', {}, iconEl('user'), 'Code saved in your profile · one purchase per account')));
     box.append(...kids);
     return box;
   }
@@ -805,21 +824,22 @@
         h('div', { html: '<svg class="check-anim" viewBox="0 0 88 88" aria-hidden="true"><circle cx="44" cy="44" r="40"/><path d="M27 45l12 12 23-25"/></svg>' }),
         h('h3', {}, c.successTitle), h('p', { class: 'muted', style: { marginTop: '6px' } }, c.successMessage),
         h('p', { class: 'chip', style: { marginTop: '14px' } }, `Order ${order.number}`)),
-      order.keys?.length ? h('div', { class: 'keybox' }, h('div', { class: 'label' }, order.keys.length > 1 ? 'Your access keys' : 'Your access key'),
+      order.keys?.length ? h('div', { class: 'keybox' }, h('div', { class: 'label' }, order.keys.length > 1 ? 'Your redeem codes' : 'Your redeem code'),
         order.keys.map((k) => h('div', {}, h('div', { class: 'muted', style: { fontSize: '13px', marginTop: '8px' } }, k.product_title),
           h('div', { class: 'k' }, h('span', {}, k.key), h('button', { class: 'btn icon sm ghost', 'aria-label': 'Copy key', html: icon('copy'), onclick: () => copy(k.key) }))))) : null]);
-      s.setFoot([h('a', { class: 'btn', href: `/invoice/${encodeURIComponent(order.number)}`, target: '_blank' }, iconEl('invoice'), 'Invoice'),
-        h('a', { class: 'btn primary', style: { flex: 1 }, href: `/watch?order=${encodeURIComponent(order.number)}` }, iconEl('play'), 'Open my library')]);
+      s.setFoot([h('a', { class: 'btn primary', style: { flex: 1 }, href: `/watch?order=${encodeURIComponent(order.number)}` }, iconEl('user'), 'Open my profile')]);
+      loadOwned();
       for (let i = 0; i < 26; i++) confetti();
     }
     function pending(order, instructions) {
+      setTimeout(loadOwned, 0);
       st.step = 'done';
       S.cart = []; S.code = ''; E.store.set('ezro-code', ''); saveCart();
       s.setBody([steps(), h('div', { class: 'success' },
         h('div', { class: 'avatar', style: { width: '64px', height: '64px', margin: '0 auto 14px' }, html: icon('clock') }),
-        h('h3', {}, 'Order placed'), h('p', { class: 'muted', style: { margin: '6px 0 16px' } }, `Order ${order.number} · ${money(order.total_cents)} — complete the payment below. Your key is sent as soon as it's confirmed.`)),
+        h('h3', {}, 'Order placed'), h('p', { class: 'muted', style: { margin: '6px 0 16px' } }, `Order ${order.number} · ${money(order.total_cents)} — complete the payment below. Your code appears in your profile as soon as it's confirmed.`)),
       h('div', { class: 'instructions' }, instructions),
-      h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '12px' } }, 'We also emailed you these instructions.')]);
+      h('p', { class: 'muted', style: { fontSize: '13px', marginTop: '12px' } }, 'You can also find this order under “My orders”.')]);
       s.setFoot([h('button', { class: 'btn', onclick: () => copy(instructions) }, iconEl('copy'), 'Copy'), h('button', { class: 'btn primary', style: { flex: 1 }, onclick: () => s.close() }, 'Done')]);
     }
     renderCart();
@@ -843,8 +863,7 @@
       s.setBody(orders.map((o) => h('div', { class: 'cart-item' },
         h('div', { class: 'thumb', html: icon(o.status === 'paid' ? 'check' : 'clock') }),
         h('div', { class: 'ci-t' }, h('strong', {}, `${o.number} · ${money(o.total_cents, o.currency)}`), h('span', { class: 'muted' }, `${o.items.map((i) => i.title).join(', ')} · ${E.fmtDate(o.created_at)}`)),
-        h('span', { class: `chip ${o.status === 'paid' ? 'good' : 'warn'}` }, o.status === 'paid' ? 'Paid' : 'Pending'),
-        h('a', { class: 'btn icon sm ghost', href: `/invoice/${encodeURIComponent(o.number)}`, target: '_blank', 'aria-label': 'Invoice', html: icon('invoice') }))));
+        h('span', { class: `chip ${o.status === 'paid' ? 'good' : 'warn'}` }, o.status === 'paid' ? 'Paid' : 'Pending'))));
     } catch (e) { fail(e); s.close(); }
   }
 

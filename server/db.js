@@ -121,7 +121,7 @@ const DEFAULTS = {
   checkout: {
     currency: 'EUR', taxPercent: 0, taxLabel: 'VAT', taxIncluded: true, requireTerms: true,
     termsText: 'I agree that this is a digital product and access is delivered instantly.',
-    successTitle: 'Payment complete', successMessage: 'Your access key has been sent to your email.',
+    successTitle: 'Payment complete', successMessage: 'Your redeem code is saved in your profile.',
     paypalEnabled: true, paypalLabel: 'PayPal', paypalDescription: 'Pay securely with PayPal or card.',
     buttonText: 'Checkout',
   },
@@ -161,7 +161,7 @@ function seed() {
   if (!get('SELECT 1 FROM payment_methods LIMIT 1')) {
     run(`INSERT INTO payment_methods (name, icon, description, instructions, enabled, sort, created_at) VALUES (?, ?, ?, ?, 0, 0, ?)`,
       'Bank transfer', 'bank', 'Pay by IBAN transfer',
-      'Send the total to:\nIBAN: GR00 0000 0000 0000 0000 0000 000\nName: Ezro\nReference: your order number ({number})\n\nYour key is sent as soon as the payment is confirmed.', now());
+      'Send the total to:\nIBAN: GR00 0000 0000 0000 0000 0000 000\nName: Ezro\nReference: your order number ({number})\n\nYour redeem code appears in your profile as soon as the payment is confirmed.', now());
   }
 }
 /* ---------- migrations ---------- */

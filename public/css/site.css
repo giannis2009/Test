@@ -464,3 +464,10 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .album.flip .flip-back { pointer-events: none; }
 .album.flip.flipped .flip-back { pointer-events: auto; }
 .album.flip.flipped .flip-front { pointer-events: none; }
+
+.owned-note { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--text); }
+.owned-note .i { color: var(--good); margin-top: 2px; }
+.owned-note.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.owned-note.warn .i { color: var(--warn); }
+.owned-note strong { display: block; }
+.owned-note span { font-size: 13px; color: var(--muted); }

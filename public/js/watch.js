@@ -84,8 +84,8 @@
     const k = keyEntry();
     const s = E.sheet({
       body: [h('div', { style: { textAlign: 'center', padding: '6px 0 18px' } },
-        h('div', { class: 'w-icon sm', html: icon('key') }), h('h3', { style: { fontSize: '22px', marginTop: '14px' } }, 'Redeem a key'),
-        h('p', { class: 'muted', style: { marginTop: '6px' } }, 'Enter the key from your invoice email.')), k.el],
+        h('div', { class: 'w-icon sm', html: icon('key') }), h('h3', { style: { fontSize: '22px', marginTop: '14px' } }, 'Redeem a code'),
+        h('p', { class: 'muted', style: { marginTop: '6px' } }, 'Enter a redeem code you received.')), k.el],
     });
     k.unlock.onclick = () => withBusy(k.unlock, async () => {
       if (k.boxes.some((b) => b.value.length !== 4)) { k.shake(); toast('Enter the full key', 'error'); return; }
@@ -104,9 +104,9 @@
     const first = (auth.user.name || auth.user.email).split(/[\s@]/)[0];
     const head = h('header', { class: 'lb-head' },
       h('div', { class: 'lb-hello' }, E.avatarEl(auth.user, 52),
-        h('div', {}, h('p', { class: 'eyebrow' }, 'Your library'), h('h1', {}, `Welcome back, ${first}`))),
+        h('div', {}, h('p', { class: 'eyebrow' }, 'Your profile'), h('h1', {}, `Welcome back, ${first}`))),
       h('div', { class: 'lb-head-acts' },
-        h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a key'),
+        h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a code'),
         h('a', { class: 'btn lg primary', href: '/#shop' }, iconEl('bag'), 'Shop')));
     const stats = h('div', { class: 'lb-stats' });
     const feature = h('div');
@@ -119,10 +119,10 @@
     if (!items.length) {
       stats.remove(); tools.remove();
       grid.replaceWith(h('div', { class: 'lb-empty' },
-        h('div', { class: 'w-icon', html: icon('film') }), h('h2', {}, 'Your library is empty'),
-        h('p', { class: 'muted' }, 'Everything you buy appears here instantly — ready to watch, with your invoice and key.'),
+        h('div', { class: 'w-icon', html: icon('film') }), h('h2', {}, 'No purchases yet'),
+        h('p', { class: 'muted' }, 'Everything you buy appears here instantly — ready to watch, with its redeem code.'),
         h('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' } },
-          h('a', { class: 'btn primary lg', href: '/#shop' }, 'Browse the shop'), h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a key'))));
+          h('a', { class: 'btn primary lg', href: '/#shop' }, 'Browse the shop'), h('button', { class: 'btn lg', onclick: redeemSheet }, iconEl('key'), 'Redeem a code'))));
       return;
     }
     const orders = new Set(items.map((i) => i.order_number)).size;
@@ -146,13 +146,12 @@
           h('h2', {}, pick.product_title), pick.subtitle ? h('p', {}, pick.subtitle) : null,
           h('div', { class: 'lb-feature-meta' }, watched ? `Last watched ${E.timeAgo(pick.last_view_at)}` : `Purchased ${E.fmtDate(pick.created_at)}`),
           h('div', { class: 'lb-feature-acts' },
-            h('button', { class: 'btn lg lb-play', onclick: () => open(pick) }, iconEl('play', 'fill'), watched ? 'Resume' : 'Play'),
-            pick.order_number ? h('a', { class: 'btn lg lb-glass', href: `/invoice/${encodeURIComponent(pick.order_number)}`, target: '_blank' }, iconEl('invoice'), 'Invoice') : null)),
+            h('button', { class: 'btn lg lb-play', onclick: () => open(pick) }, iconEl('play', 'fill'), watched ? 'Resume' : 'Play'))),
         pick.cover_url ? h('div', { class: 'lb-feature-art' }, h('img', { src: pick.cover_url, alt: '' })) : null)));
     }
 
     const search = h('div', { class: 'input-wrap lb-search' }, iconEl('search'),
-      E.input(lib.q, { placeholder: 'Search your library…', oninput: E.debounce((e) => { lib.q = e.target.value; draw(); }, 120) }));
+      E.input(lib.q, { placeholder: 'Search your purchases…', oninput: E.debounce((e) => { lib.q = e.target.value; draw(); }, 120) }));
     const hasOther = items.some((i) => !i.hasVideo);
     tools.replaceChildren(h('h2', {}, 'All purchases'), h('div', { class: 'lb-tools-r' }, search,
       hasOther ? E.segmented([['all', 'All'], ['video', 'Videos'], ['other', 'Files']], lib.filter, (v) => { lib.filter = v; draw(); }) : null,
@@ -162,13 +161,13 @@
       const isNew = highlight && it.order_number === highlight;
       const keyTxt = h('span', { class: 'mono' }, it.key);
       let revealed = false;
-      const eye = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Show key', title: 'Show key', html: icon('eye') });
+      const eye = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Show code', title: 'Show code', html: icon('eye') });
       eye.onclick = async (e) => {
         e.stopPropagation();
         if (revealed) { keyTxt.textContent = it.key; revealed = false; return; }
         try { const { key } = await api('/api/watch/key', { body: { licenseId: it.id } }); keyTxt.textContent = key; revealed = true; } catch (err) { fail(err); }
       };
-      const cp = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Copy key', title: 'Copy key', html: icon('copy') });
+      const cp = h('button', { class: 'btn icon sm ghost', 'aria-label': 'Copy code', title: 'Copy code', html: icon('copy') });
       cp.onclick = async (e) => { e.stopPropagation(); try { const { key } = await api('/api/watch/key', { body: { licenseId: it.id } }); E.copy(key); } catch (err) { fail(err); } };
       const el = h('article', { class: `lb-card ${isNew ? 'is-new' : ''}`, tabindex: '0', onkeydown: (e) => e.key === 'Enter' && e.target === el && open(it) },
         h('div', { class: 'lb-cov', onclick: () => open(it) },
@@ -184,7 +183,6 @@
             h('div', { class: 'lb-meta' }, h('span', {}, E.fmtDate(it.created_at)), it.order_number ? h('span', {}, `#${it.order_number}`) : null,
               it.total_cents != null ? h('span', {}, money(it.total_cents, it.currency)) : null),
             h('div', { class: 'lb-acts' },
-              it.order_number ? h('a', { class: 'btn icon sm', href: `/invoice/${encodeURIComponent(it.order_number)}`, target: '_blank', 'aria-label': 'Invoice', title: 'Invoice', html: icon('invoice') }) : null,
               it.hasVideo ? h('button', { class: 'btn sm primary', onclick: () => open(it) }, iconEl('play', 'fill'), 'Watch') : h('span', { class: 'chip' }, 'No video')))));
       return E.reveal(el, (i % 6) * 60);
     }

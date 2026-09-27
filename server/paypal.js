@@ -43,12 +43,11 @@ function createOrder(order, brandName) {
     purchase_units: [{
       reference_id: String(order.id),
       custom_id: String(order.id),
-      invoice_id: order.number,
       description: `${brandName} order ${order.number}`.slice(0, 127),
       amount: { currency_code: order.currency, value: fmt(order.total_cents) },
     }],
     application_context: { brand_name: brandName.slice(0, 127), shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW' },
-  }, `create-${order.id}`);
+  }, `create-${order.id}-${order.created_at}`);
 }
 
 const captureOrder = (paypalOrderId) => call(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, 'POST', {}, `capture-${paypalOrderId}`);
