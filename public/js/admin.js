@@ -10,7 +10,7 @@
   const Admin = window.Admin = { pages: {}, site: null, me: null };
 
   const NAV = [
-    ['Overview', [['dashboard', 'Dashboard', 'dashboard']]],
+    ['Overview', [['dashboard', 'Dashboard', 'dashboard'], ['likes', 'Likes', 'heart']]],
     ['Store', [['orders', 'Orders', 'receipt'], ['products', 'Products', 'box'], ['discounts', 'Discounts', 'percent'], ['payments', 'Payments & Checkout', 'card']]],
     ['Content', [['media', 'Categories & Media', 'image'], ['socials', 'Social media', 'share'], ['texts', 'Texts', 'type'], ['appearance', 'Appearance', 'palette']]],
     ['Workspace', [['tasks', 'Tasks', 'tasks'], ['customers', 'Customers', 'users']]],
@@ -586,6 +586,38 @@
             h('div', { class: 'secure-note', style: { fontSize: '13px', color: 'var(--muted)' } }, 'Keys only work while signed in with the buyer’s Google account, stream links expire and are tied to the login session, and the Drive file is never exposed. Browsers cannot fully block screen recording — for guaranteed black-screen capture, use a DRM video host (see README).'),
             h('div', { class: 'form-actions' }, save)))))),
     ];
+  };
+
+  /* ================= Likes ================= */
+  Admin.pages.likes = async () => {
+    const { items, totals } = await api('/api/admin/reactions');
+    const KIND = { product: 'Product', album: 'Album', media: 'Cover' };
+    let filter = 'all';
+    const listBox = h('div');
+    const pct = (x) => (x.likes + x.dislikes ? Math.round((x.likes / (x.likes + x.dislikes)) * 100) : 0);
+    const draw = () => {
+      const rows = items.filter((x) => filter === 'all' || x.type === filter);
+      listBox.replaceChildren(rows.length ? h('div', { class: 'list' }, rows.map((x, i) => h('div', { class: 'lrow lk-row' },
+        h('span', { class: 'lk-rank' }, `#${i + 1}`),
+        x.image ? h('img', { class: 'lk-img', src: x.image, alt: '' }) : h('div', { class: 'ic', html: icon('image') }),
+        h('div', { class: 'tt' }, h('strong', {}, x.title || '—'), h('span', {}, `${KIND[x.type]} · last vote ${E.timeAgo(x.last)}`)),
+        h('div', { class: 'lk-bar', title: `${pct(x)}% like it` }, h('i', { style: { width: `${pct(x)}%` } })),
+        h('span', { class: 'lk-n like' }, '❤️ ', String(x.likes)), h('span', { class: 'lk-n' }, '👎 ', String(x.dislikes)),
+        h('button', { class: 'btn icon sm ghost', 'aria-label': 'Reset votes', title: 'Reset votes', html: icon('refresh'), onclick: async () => {
+          if (await E.confirmDialog(`Reset the votes of “${x.title}”?`, 'Its likes and dislikes go back to zero.', { ok: 'Reset', danger: true })) { await api(`/api/admin/reactions/${x.type}/${x.id}`, { method: 'DELETE' }).catch(fail); Admin.refresh(); }
+        } }))))
+        : h('div', { class: 'empty' }, iconEl('heart'), 'No votes yet — they appear here as soon as visitors tap the heart.'));
+    };
+    draw();
+    return [Admin.head('Likes', 'What people love — hearts and thumbs-down on products, albums and covers.'),
+      h('div', { class: 'page' },
+        h('div', { class: 'stats', style: { marginBottom: '18px' } },
+          Admin.stat('Likes', String(totals.likes), 'brand', `${totals.week} this week`),
+          Admin.stat('Not for me', String(totals.dislikes)),
+          Admin.stat('People who voted', String(totals.voters)),
+          Admin.stat('Most liked', items[0]?.title || '—', '', items[0] ? `❤️ ${items[0].likes}` : '')),
+        Admin.panel(h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', width: '100%', flexWrap: 'wrap' } }, h('span', {}, 'Ranking'), h('span', { style: { flex: 1 } }),
+          E.segmented([['all', 'All'], ['product', 'Products'], ['album', 'Albums'], ['media', 'Covers']], filter, (v) => { filter = v; draw(); })), listBox))];
   };
 
   /* ================= Backups ================= */

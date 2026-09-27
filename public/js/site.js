@@ -98,6 +98,7 @@
     try {
       const [site, prod, media] = await Promise.all([api('/api/public/site'), api('/api/public/products'), api('/api/public/media')]);
       S.site = site; S.products = prod.products; S.media = media.media; S.albums = media.albums || [];
+      loadReactions();
     } catch (e) { fail(e); hideLoader(); return; }
     // use the logo chosen in Admin → Appearance for the loader too
     const logo = site_logo();
@@ -366,7 +367,7 @@
     tile.onclick = open;
     tile.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     tile.addEventListener('contextmenu', (e) => e.preventDefault());
-    tile.append(shareBtn(() => shareCover(m), 'on-card'));
+    tile.append(shareBtn(() => shareCover(m), 'on-card'), reactBar('media', m.id, { compact: true, dark: true }));
     natural(tile, m.url, m.type === 'video');
     return hasSong(m) ? songTile(tile, mediaSong(m)) : tile;
   }
@@ -395,7 +396,8 @@
       h('span', { class: 'album-sheen', 'aria-hidden': 'true' }),
       h('div', { class: 'album-meta' }, catName ? h('span', { class: 'eyebrow' }, catName) : null, h('strong', {}, a.title),
         a.artist ? h('span', { class: 'album-artist' }, a.artist) : null),
-      h('span', { class: 'album-go', html: icon('arrow-up-right') }));
+      h('span', { class: 'album-go', html: icon('arrow-up-right') }),
+      reactBar('album', a.id, { compact: true, dark: true }));
     card.addEventListener('click', (e) => {
       e.preventDefault();
       if (hasSong(a)) { playSong(albumSong(a), card); return; }
@@ -556,7 +558,7 @@
           return c;
         })() : null,
         h('div', { class: 'album-hero-text' }, catObj ? h('p', { class: 'eyebrow' }, catObj.name) : null, h('h1', {}, a.title),
-          h('div', {}, h('button', { class: 'btn sm', onclick: () => share({ path: `/album/${a.id}`, title: a.title, text: [a.song_title, a.artist].filter(Boolean).join(' — '), image: cover }) }, iconEl('share'), 'Share')),
+          h('div', { class: 'rx-row' }, reactBar('album', a.id), h('button', { class: 'btn sm', onclick: () => share({ path: `/album/${a.id}`, title: a.title, text: [a.song_title, a.artist].filter(Boolean).join(' — '), image: cover }) }, iconEl('share'), 'Share')),
           a.song_title || a.artist ? h('p', { class: 'album-song' }, a.song_title ? h('strong', {}, a.song_title) : null, a.song_title && a.artist ? ' — ' : null, a.artist || null) : null,
           [a.release_date, a.genre].some(Boolean) ? h('div', { class: 'album-facts' }, [a.release_date, a.genre].filter(Boolean).map((t) => h('span', { class: 'chip' }, t))) : null,
           a.description ? h('p', {}, a.description) : null,
@@ -611,12 +613,13 @@
     const songSlot = h('div', { class: 'lb-song' });
     const body = h('div', { class: 'lb-body' }, stage, songSlot);
     const cap = h('div', { class: 'lb-cap' });
+    const rxSlot = h('div', { class: 'lb-rx' });
     const stopInline = () => { if (player.panel?.classList.contains('inline')) closeSong(); };
     const basePath = location.pathname.startsWith('/cover/') ? '/' : location.pathname;
     const close = () => { stopInline(); history.replaceState(history.state, '', basePath); lb.classList.add('closing'); setTimeout(() => lb.remove(), 250); document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
     const show = () => {
       const m = items[i];
-      if (m.id) history.replaceState(history.state, '', `/cover/${m.id}`);
+      if (m.id) { history.replaceState(history.state, '', `/cover/${m.id}`); rxSlot.replaceChildren(reactBar('media', m.id, { dark: true })); }
       const el = m.type === 'video' ? h('video', { src: m.url, controls: true, autoplay: true, playsinline: true, loop: true }) : h('img', { src: m.url, alt: m.title || '', draggable: 'false', oncontextmenu: (e) => e.preventDefault() });
       stage.replaceChildren(el);
       el.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.34,1.4,.64,1)' });
@@ -630,7 +633,7 @@
       cap.replaceChildren(!song && m.title ? h('strong', {}, m.title) : '', !song && m.caption ? h('p', {}, m.caption) : '');
     };
     const nav = (d) => { i = (i + d + items.length) % items.length; show(); };
-    const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-modal': 'true' }, body, cap,
+    const lb = h('div', { class: 'lightbox', role: 'dialog', 'aria-modal': 'true' }, body, cap, rxSlot,
       h('button', { class: 'btn icon lb-close', 'aria-label': 'Close', html: icon('close'), onclick: close }),
       h('button', { class: 'btn icon lb-share', 'aria-label': 'Share', title: 'Share', html: icon('share'), onclick: (e) => { e.stopPropagation(); shareCover(items[i]); } }),
       items.length > 1 ? h('button', { class: 'btn icon lb-nav prev', 'aria-label': 'Previous', html: icon('chevron-left'), onclick: (e) => { e.stopPropagation(); nav(-1); } }) : null,
@@ -671,6 +674,62 @@
     tick(); soonTimers.push(setInterval(tick, 1000));
     return el;
   }
+  /* ---------- likes: ❤️ with a count (and 👎) on products, albums and covers — saved in the database ---------- */
+  S.react = { counts: {}, mine: {} };
+  async function loadReactions() {
+    try { S.react = await api('/api/public/reactions'); } catch { /* offline */ }
+    $$('[data-react]').forEach(paintReact);
+  }
+  const fmtN = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace('.0', '')}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1).replace('.0', '')}K` : String(n || 0));
+  function paintReact(el) {
+    const k = el.dataset.react; const c = S.react.counts[k] || { likes: 0, dislikes: 0 }; const m = S.react.mine[k] || 0;
+    const like = el.querySelector('.rx-like'); const dis = el.querySelector('.rx-dis');
+    like.classList.toggle('on', m === 1); like.setAttribute('aria-pressed', String(m === 1)); like.querySelector('.rx-n').textContent = fmtN(c.likes);
+    if (dis) { dis.classList.toggle('on', m === -1); dis.setAttribute('aria-pressed', String(m === -1)); dis.querySelector('.rx-n').textContent = fmtN(c.dislikes); }
+  }
+  let reactBusy = false;
+  async function react(key, value, btn) {
+    if (reactBusy) return;
+    const [type, id] = key.split(':');
+    const cur = S.react.mine[key] || 0;
+    const next = cur === value ? 0 : value; // same choice again = take the vote back
+    // show it straight away, then confirm with the server
+    const c = { ...(S.react.counts[key] || { likes: 0, dislikes: 0 }) };
+    if (cur === 1) c.likes -= 1; if (cur === -1) c.dislikes -= 1;
+    if (next === 1) c.likes += 1; if (next === -1) c.dislikes += 1;
+    S.react.counts[key] = c; S.react.mine[key] = next;
+    $$(`[data-react="${key}"]`).forEach(paintReact);
+    if (next === 1 && btn) { btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop'); burst(btn); }
+    reactBusy = true;
+    try {
+      const r = await api('/api/public/react', { body: { type, id: Number(id), value: next } });
+      S.react.counts[key] = { likes: r.likes, dislikes: r.dislikes }; S.react.mine[key] = r.mine;
+    } catch (e) { fail(e); } finally { reactBusy = false; $$(`[data-react="${key}"]`).forEach(paintReact); }
+  }
+  // little hearts flying out of the button
+  function burst(btn) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const r = btn.getBoundingClientRect();
+    for (let i = 0; i < 7; i++) {
+      const p = h('span', { class: 'rx-burst', html: icon('heart') });
+      p.style.left = `${r.left + 16}px`; p.style.top = `${r.top + r.height / 2}px`;
+      document.body.append(p);
+      const a = (Math.PI * 2 * i) / 7 - Math.PI / 2; const d = 26 + Math.random() * 18;
+      p.animate([{ transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(${0.7 + Math.random() * 0.5})`, opacity: 0 }],
+        { duration: 650 + Math.random() * 250, easing: 'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => p.remove();
+    }
+  }
+  // compact = just the heart and its number (cards); full = ❤️ count + 👎 count (pages, full view)
+  function reactBar(type, id, { compact = false, dark = false } = {}) {
+    const key = `${type}:${id}`;
+    const btn = (cls, ic, value, label) => h('button', { type: 'button', class: `rx-btn ${cls}`, 'aria-label': label, title: label, onclick: (e) => { e.preventDefault(); e.stopPropagation(); react(key, value, e.currentTarget); } },
+      h('span', { class: 'rx-ic', html: icon(ic) }), h('span', { class: 'rx-n' }, '0'));
+    const el = h('div', { class: `rx ${compact ? 'compact' : ''} ${dark ? 'dark' : ''}`, dataset: { react: key } },
+      btn('rx-like', 'heart', 1, 'Like'), compact ? null : btn('rx-dis', 'thumb-down', -1, 'Not for me'));
+    paintReact(el);
+    return el;
+  }
+
   function productCard(p) {
     const soon = p.status === 'coming_soon';
     const off = p.compare_cents > p.price_cents ? Math.round((1 - p.price_cents / p.compare_cents) * 100) : 0;
@@ -681,7 +740,8 @@
         off && !soon ? h('span', { class: 'chip' }, `−${off}%`) : null,
         p.soldOut ? h('span', { class: 'chip' }, 'Sold out') : null,
         p.stockLeft && !p.soldOut ? h('span', { class: 'chip' }, `Only ${p.stockLeft} left`) : null),
-      soon ? h('div', { class: 'soon-veil' }, h('strong', {}, 'Coming soon'), p.release_at && p.release_at > Date.now() ? countdown(p.release_at) : null) : null);
+      soon ? h('div', { class: 'soon-veil' }, h('strong', {}, 'Coming soon'), p.release_at && p.release_at > Date.now() ? countdown(p.release_at) : null) : null,
+      reactBar('product', p.id, { compact: true, dark: true }));
     const card = h('article', { class: `product ${soon ? 'soon' : ''}`, tabindex: '0' }, media,
       h('div', { class: 'p-body' },
         h('div', { class: 'p-title' }, p.title),
@@ -849,7 +909,7 @@
         h('div', { class: 'pp-info' },
           cat ? h('p', { class: 'eyebrow' }, cat.name) : null,
           h('h1', {}, p.title), p.subtitle ? h('p', { class: 'pp-sub' }, p.subtitle) : null,
-          h('div', { style: { marginTop: '14px' } }, h('button', { class: 'btn sm', onclick: () => share({ path: `/product/${encodeURIComponent(p.slug)}`, title: p.title, text: p.subtitle, image: p.cover_url || p.gallery?.[0] }) }, iconEl('share'), 'Share')),
+          h('div', { class: 'rx-row', style: { marginTop: '14px' } }, reactBar('product', p.id), h('button', { class: 'btn sm', onclick: () => share({ path: `/product/${encodeURIComponent(p.slug)}`, title: p.title, text: p.subtitle, image: p.cover_url || p.gallery?.[0] }) }, iconEl('share'), 'Share')),
           p.badge ? h('span', { class: 'chip brand', style: { marginTop: '12px' } }, p.badge) : null,
           p.description ? h('p', { class: 'pv-desc', style: { marginTop: '22px' } }, p.description) : null,
           p.features?.length ? h('div', { class: 'pp-block' }, h('h3', {}, 'What’s included'), h('ul', { class: 'features' }, p.features.map((f) => h('li', {}, iconEl('check'), h('span', {}, f))))) : null,

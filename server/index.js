@@ -67,6 +67,7 @@ app.use('/api', (req, res, next) => {
 app.use('/api/auth', auth.router);
 app.use('/api/admin-auth', adminAuth.router);
 app.use('/api/public', publicApi.router);
+app.use('/api/public', require('./reactions').router);
 app.use('/api/shop', shop.router);
 app.use('/api/watch', watch.router);
 app.use('/api/admin', admin.router);

@@ -338,3 +338,11 @@ table.t tbody tr.click:hover { background: var(--hover); }
 @media (max-width: 640px) { .tfa-setup { grid-template-columns: 1fr; justify-items: center; } }
 .rec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .rec-grid code { padding: 10px; text-align: center; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); font: 600 15px var(--mono); letter-spacing: .08em; }
+.lk-row { gap: 12px; }
+.lk-rank { width: 30px; flex: none; font: 700 12px var(--mono); color: var(--muted); }
+.lk-img { width: 44px; height: 44px; flex: none; border-radius: 10px; object-fit: cover; }
+.lk-bar { width: 110px; height: 6px; flex: none; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.lk-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #ff4d7d, #ff8fb0); }
+.lk-n { flex: none; min-width: 58px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.lk-n.like { color: var(--text); }
+@media (max-width: 700px) { .lk-bar { display: none; } .lk-n { min-width: 44px; } }

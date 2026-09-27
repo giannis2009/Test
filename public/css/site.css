@@ -557,3 +557,33 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .sh-link { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
 .sh-link .mono { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 @media (max-width: 400px) { .sh-grid { gap: 4px; } .sh-ic { width: 42px; height: 42px; } }
+
+/* ---------- likes ---------- */
+.rx { display: inline-flex; align-items: center; gap: 6px; }
+.rx-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rx-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px 0 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-2); font: 700 13px var(--font, inherit); cursor: pointer; transition: background .2s, color .2s, border-color .2s, transform .3s var(--spring); }
+.rx-btn:hover { color: var(--text); border-color: var(--border-2); transform: translateY(-1px); }
+.rx-btn:active { transform: scale(.94); }
+.rx-ic { display: grid; } .rx-ic .i { width: 17px; height: 17px; transition: transform .35s var(--spring); }
+.rx-n { font-variant-numeric: tabular-nums; min-width: 1ch; }
+.rx-like.on { color: #ff4d7d; border-color: color-mix(in srgb, #ff4d7d 40%, transparent); background: color-mix(in srgb, #ff4d7d 12%, var(--surface)); }
+.rx-like.on .i { fill: currentColor; }
+.rx-dis.on { color: var(--brand-2); border-color: color-mix(in srgb, var(--brand-2) 40%, transparent); background: color-mix(in srgb, var(--brand) 12%, var(--surface)); }
+.rx-dis.on .i { fill: color-mix(in srgb, currentColor 25%, transparent); }
+.rx-btn.pop .i { animation: rxPop .5s var(--spring); }
+@keyframes rxPop { 0% { transform: scale(1); } 35% { transform: scale(1.45); } 100% { transform: scale(1); } }
+.rx-burst { position: fixed; z-index: 2000; pointer-events: none; color: #ff4d7d; }
+.rx-burst .i { width: 13px; height: 13px; fill: currentColor; }
+/* on cards and in the full view: a small glass pill over the image */
+.rx.dark .rx-btn { background: rgba(12, 8, 20, .5); border-color: rgba(255, 255, 255, .16); color: #fff; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.rx.dark .rx-btn:hover { background: rgba(12, 8, 20, .7); }
+.rx.dark .rx-like.on { color: #ff6b93; background: rgba(40, 8, 20, .6); border-color: rgba(255, 77, 125, .5); }
+.rx.compact .rx-btn { height: 30px; padding: 0 10px 0 9px; font-size: 12px; gap: 5px; }
+.rx.compact .rx-ic .i { width: 15px; height: 15px; }
+.album > .rx.compact, .p-media > .rx.compact { position: absolute; z-index: 6; right: 12px; bottom: 12px; }
+.album > .rx.compact { transition: opacity .3s var(--ease); }
+.album:hover > .rx.compact { opacity: 1; }
+.p-media { position: relative; }
+.lightbox .lb-rx { position: absolute; top: 18px; left: 18px; z-index: 2; }
+@media (max-width: 560px) { .album > .rx.compact { right: 7px; bottom: 7px; } .rx.compact .rx-btn { height: 26px; padding: 0 8px; font-size: 11px; } .album-meta { padding-right: 60px; } }
