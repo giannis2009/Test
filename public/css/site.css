@@ -444,7 +444,9 @@ body.loading .nav-wrap { opacity: 0; transform: translateY(-16px); }
 .pp-box-head span { font-size: 12.5px; color: var(--muted); }
 .pp-amount { margin-left: auto; text-align: right; }
 .pp-amount strong { font-size: 20px; letter-spacing: -.02em; }
-.pp-box .paypal-slot { margin: 0; padding: 18px 18px 6px; min-height: 120px; }
+.pp-box .paypal-slot { margin: 0; padding: 18px 18px 6px; min-height: 120px; background: transparent; }
+/* Chrome paints an opaque white canvas behind a cross-origin iframe when the page is dark and the frame is light — matching the scheme keeps it transparent */
+.paypal-slot, .paypal-slot iframe, .sp-embed { color-scheme: light; background: transparent !important; }
 .pp-skel { display: grid; gap: 12px; }
 .pp-skel span { height: 48px; border-radius: 999px; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
 .pp-box-foot { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px 16px; font-size: 12px; color: var(--muted); }

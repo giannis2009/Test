@@ -57,12 +57,20 @@
 .p-controls .i { width: 20px; height: 20px; }
 .p-controls .i.fillme { fill: currentColor; stroke: none; }
 .p-time { font: 600 12px var(--mono); opacity: .85; white-space: nowrap; }
-.p-bar { position: relative; flex: 1; height: 22px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+.p-bar { position: relative; flex: 1 1 auto; min-width: 60px; height: 22px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
 .p-bar .rail { position: absolute; left: 0; right: 0; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .22); overflow: hidden; transition: height .2s; }
 .p-bar:hover .rail { height: 8px; }
 .p-bar .buf { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255, 255, 255, .25); }
 .p-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand-grad); }
-.p-vol { width: 80px; accent-color: #fff; }
+.p-bar .knob { position: absolute; top: 50%; left: 0; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .45); transform: scale(0); transition: transform .2s var(--spring); pointer-events: none; }
+.p-bar:hover .knob, .p-bar.drag .knob, .p-bar:focus-visible .knob { transform: scale(1); }
+.p-controls .p-vol { flex: none; width: 80px; height: 22px; margin: 0; padding: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; accent-color: #fff; }
+.p-controls .p-vol::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, #fff var(--v, 100%), rgba(255, 255, 255, .25) var(--v, 100%)); }
+.p-controls .p-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; border: 0; }
+.p-controls .p-vol::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .25); }
+.p-controls .p-vol::-moz-range-progress { height: 4px; border-radius: 4px; background: #fff; }
+.p-controls .p-vol::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
+.p-controls > button, .p-controls .p-time { flex: none; }
 @media (max-width: 560px) { .p-vol { display: none; } .p-controls { left: 8px; right: 8px; bottom: 8px; gap: 4px; } }
 .protect-note { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
 .protect-note .i { color: var(--good); }

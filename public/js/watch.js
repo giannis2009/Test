@@ -264,8 +264,8 @@
     const bigBtn = h('div', { class: 'big', html: icon('play') });
     const center = h('div', { class: 'p-center' }, bigBtn);
     const playBtn = h('button', { 'aria-label': 'Play', html: icon('play', 'fillme') });
-    const fill = h('div', { class: 'fill' }); const buf = h('div', { class: 'buf' });
-    const bar = h('div', { class: 'p-bar', role: 'slider', 'aria-label': 'Seek', tabindex: '0' }, h('div', { class: 'rail' }, buf, fill));
+    const fill = h('div', { class: 'fill' }); const buf = h('div', { class: 'buf' }); const knob = h('div', { class: 'knob' });
+    const bar = h('div', { class: 'p-bar', role: 'slider', 'aria-label': 'Seek', tabindex: '0' }, h('div', { class: 'rail' }, buf, fill), knob);
     const time = h('span', { class: 'p-time' }, '0:00 / 0:00');
     const muteBtn = h('button', { 'aria-label': 'Mute', html: icon('volume') });
     const vol = h('input', { type: 'range', min: '0', max: '1', step: '0.05', value: '1', class: 'p-vol', 'aria-label': 'Volume' });
@@ -308,20 +308,24 @@
     playBtn.onclick = toggle; center.onclick = toggle;
     video.addEventListener('play', setPlayIcon); video.addEventListener('pause', setPlayIcon);
     video.addEventListener('timeupdate', () => {
-      fill.style.width = `${(video.currentTime / video.duration) * 100 || 0}%`;
+      const pct = `${(video.currentTime / video.duration) * 100 || 0}%`;
+      fill.style.width = pct; knob.style.left = pct;
+      bar.setAttribute('aria-valuenow', Math.round(parseFloat(pct)));
       time.textContent = `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
     });
     video.addEventListener('progress', () => { if (video.buffered.length) buf.style.width = `${(video.buffered.end(video.buffered.length - 1) / video.duration) * 100}%`; });
     const seekTo = (x) => { const r = bar.getBoundingClientRect(); video.currentTime = Math.max(0, Math.min(1, (x - r.left) / r.width)) * (video.duration || 0); };
     bar.addEventListener('pointerdown', (e) => {
-      seekTo(e.clientX); bar.setPointerCapture(e.pointerId);
+      seekTo(e.clientX); bar.setPointerCapture(e.pointerId); bar.classList.add('drag');
       const mv = (ev) => seekTo(ev.clientX);
       bar.addEventListener('pointermove', mv);
-      bar.addEventListener('pointerup', () => bar.removeEventListener('pointermove', mv), { once: true });
+      bar.addEventListener('pointerup', () => { bar.removeEventListener('pointermove', mv); bar.classList.remove('drag'); }, { once: true });
     });
     bar.onkeydown = (e) => { if (e.key === 'ArrowRight') video.currentTime += 5; if (e.key === 'ArrowLeft') video.currentTime -= 5; };
-    vol.oninput = () => { video.volume = Number(vol.value); video.muted = video.volume === 0; muteBtn.innerHTML = icon(video.muted ? 'mute' : 'volume'); };
-    muteBtn.onclick = () => { video.muted = !video.muted; muteBtn.innerHTML = icon(video.muted ? 'mute' : 'volume'); };
+    const syncVol = () => { const v = video.muted ? 0 : video.volume; vol.value = String(v); vol.style.setProperty('--v', `${v * 100}%`); muteBtn.innerHTML = icon(v === 0 ? 'mute' : 'volume'); };
+    vol.oninput = () => { video.volume = Number(vol.value); video.muted = video.volume === 0; syncVol(); };
+    muteBtn.onclick = () => { if (video.muted || video.volume === 0) { video.muted = false; if (!video.volume) video.volume = 1; } else video.muted = true; syncVol(); };
+    video.addEventListener('volumechange', syncVol);
     fsBtn.onclick = () => (document.fullscreenElement ? document.exitFullscreen() : player.requestFullscreen?.().catch(() => {}));
     player.addEventListener('dblclick', () => fsBtn.click());
     player.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'k') { e.preventDefault(); toggle(); } if (e.key === 'f') fsBtn.click(); });
